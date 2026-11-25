@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import * as THREE from 'three';
 import {
   advancePlayer, initialPlayer, initialStats, movementDirection,
   recordShot, shotAccuracy, RANGE_GOAL,
@@ -9,9 +10,15 @@ const forward = { forward: 1, right: 0, sprint: false, jumpPressed: false, slide
 
 test('forward movement follows the first-person yaw orientation', () => {
   assert.deepEqual(movementDirection(1, 0, 0), { x: 0, z: -1 });
-  const east = movementDirection(1, 0, Math.PI / 2);
-  assert.ok(Math.abs(east.x - 1) < 1e-10);
-  assert.ok(Math.abs(east.z) < 1e-10);
+  for (const yaw of [-Math.PI / 2, 0, Math.PI / 4, Math.PI / 2]) {
+    const camera = new THREE.PerspectiveCamera();
+    camera.rotation.y = yaw;
+    camera.updateMatrixWorld(true);
+    const look = camera.getWorldDirection(new THREE.Vector3());
+    const direction = movementDirection(1, 0, yaw);
+    assert.ok(Math.abs(direction.x - look.x) < 1e-10, `X direction mismatch at yaw ${yaw}`);
+    assert.ok(Math.abs(direction.z - look.z) < 1e-10, `Z direction mismatch at yaw ${yaw}`);
+  }
 });
 
 test('diagonal inputs are normalized to prevent speed exploits', () => {

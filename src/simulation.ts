@@ -58,7 +58,8 @@ export function movementDirection(forward: number, right: number, yaw: number): 
   if (magnitude < 0.001) return { x: 0, z: 0 };
   const f = forward / magnitude;
   const r = right / magnitude;
-  return { x: Math.sin(yaw) * f + Math.cos(yaw) * r, z: -Math.cos(yaw) * f + Math.sin(yaw) * r };
+  // Match Three.js camera yaw: positive yaw turns the camera toward -X.
+  return { x: -Math.sin(yaw) * f + Math.cos(yaw) * r, z: -Math.cos(yaw) * f - Math.sin(yaw) * r };
 }
 
 function collides(x: number, z: number, blockers: readonly Blocker[]): boolean {
