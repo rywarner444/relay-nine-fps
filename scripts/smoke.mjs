@@ -28,7 +28,7 @@ try {
   page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
 
   await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
-  await page.getByRole('heading', { name: /step into the signal/i }).waitFor();
+  await page.getByRole('heading', { name: /enter the unknown/i }).waitFor();
   await page.locator('#qualitySelect').selectOption('low');
   await mkdir('artifacts', { recursive: true });
   await page.screenshot({ path: 'artifacts/menu.png' });

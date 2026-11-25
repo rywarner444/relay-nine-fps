@@ -61,6 +61,7 @@ let pitch = -0.03;
 let fireHeld = false;
 let jumpPressed = false;
 let slidePressed = false;
+let slideBuffer = 0;
 let lastFireTime = 0;
 let ammo = 30;
 let reloading = 0;
@@ -71,6 +72,8 @@ let fpsFrames = 0;
 let fpsTotal = 0;
 let fps = 0;
 let frameMs = 0;
+let strugglingSeconds = 0;
+let autoTierOverride: GraphicsTier | null = null;
 let notifyTimer: number | undefined;
 let hitTimer: number | undefined;
 let taskComplete = false;
@@ -142,21 +145,26 @@ function updateAmmo(): void {
 function resolveTier(): GraphicsTier {
   const selected = qualitySelect.value;
   if (selected === 'low' || selected === 'medium' || selected === 'high') return selected;
-  return navigator.hardwareConcurrency >= 8 && window.innerWidth > 1080 ? 'high' : 'medium';
+  // Device thread count is not a reliable proxy for GPU power (especially in VMs).
+  return autoTierOverride ?? 'medium';
 }
 
 let tier: GraphicsTier = resolveTier();
 
 function resize(): void {
   tier = resolveTier();
-  const ratio = tier === 'high' ? Math.min(window.devicePixelRatio, 1.65) : tier === 'medium' ? Math.min(window.devicePixelRatio, 1.2) : 0.85;
+  // Render-pixel budgets matter more than UI resolution for integrated/software GPUs.
+  const maxPixels = tier === 'high' ? 2_300_000 : tier === 'medium' ? 1_200_000 : 650_000;
+  const ratio = Math.min(window.devicePixelRatio || 1, Math.sqrt(maxPixels / (window.innerWidth * window.innerHeight)));
   renderer.setPixelRatio(ratio);
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   arena.camera.aspect = window.innerWidth / window.innerHeight;
   arena.camera.updateProjectionMatrix();
+  composer.setPixelRatio(ratio);
   composer.setSize(window.innerWidth, window.innerHeight);
-  bloom.enabled = tier !== 'low' && !reducedMotion.matches;
-  bloom.strength = tier === 'high' ? 0.44 : 0.23;
+  // Postprocessing is a premium preset effect, never needed for standard gameplay.
+  bloom.enabled = tier === 'high' && !reducedMotion.matches;
+  bloom.strength = 0.32;
   arena.setGraphicsTier(tier);
 }
 
@@ -169,6 +177,10 @@ function resetRange(): void {
   taskComplete = false;
   yaw = 0;
   pitch = -0.03;
+  slideBuffer = 0;
+  slidePressed = false;
+  element<HTMLElement>('slideStatus').hidden = true;
+  element<HTMLElement>('speedLines').classList.remove('active');
   element('objectiveTitle').textContent = 'Clear the hostile drone signatures';
   element('objectiveText').textContent = 'Aim at magenta drones and fire. Avoid the amber maintenance unit.';
   updateStats();
@@ -202,6 +214,9 @@ function pauseGame(): void {
   paused = true;
   keys.clear();
   fireHeld = false;
+  slideBuffer = 0;
+  element<HTMLElement>('slideStatus').hidden = true;
+  element<HTMLElement>('speedLines').classList.remove('active');
   menuOverlay.hidden = false;
   deployButton.innerHTML = '<span>▶</span> RESUME TRAINING';
   if (document.pointerLockElement === canvas) void document.exitPointerLock();
@@ -258,6 +273,16 @@ function updateMetrics(delta: number): void {
     frameMs = (fpsTotal / fpsFrames) * 1000;
     fpsTotal = 0;
     fpsFrames = 0;
+    element('fpsChip').textContent = `${fps} FPS`;
+    if (!paused && qualitySelect.value === 'auto' && tier === 'medium' && fps > 0 && fps < 35) {
+      strugglingSeconds += 0.6;
+      if (strugglingSeconds >= 2.4) {
+        autoTierOverride = 'low';
+        strugglingSeconds = 0;
+        resize();
+        announce('PERFORMANCE MODE ENABLED // PRESS ESC FOR SETTINGS', 'neutral', 4000);
+      }
+    } else strugglingSeconds = 0;
   }
   if (!engineeringPanel.hidden) {
     element('metricFps').textContent = `${fps} FPS`;
@@ -270,7 +295,8 @@ function updateMetrics(delta: number): void {
 }
 
 function loop(timeMs: number): void {
-  const elapsed = Math.max(0, Math.min((timeMs - lastTime) / 1000, 0.05));
+  const rawElapsed = Math.max(0, Math.min((timeMs - lastTime) / 1000, 0.5));
+  const elapsed = Math.min(rawElapsed, 0.05);
   lastTime = timeMs;
   visibleTime += elapsed;
   if (!paused) {
@@ -279,14 +305,25 @@ function loop(timeMs: number): void {
     const right = Number(keys.has('KeyD') || keys.has('ArrowRight')) - Number(keys.has('KeyA') || keys.has('ArrowLeft'));
     const sprint = keys.has('ShiftLeft') || keys.has('ShiftRight');
     const prior = player;
-    player = advancePlayer(player, { forward, right, sprint, jumpPressed, slidePressed }, yaw, elapsed, arena.blockers);
+    player = advancePlayer(player, { forward, right, sprint, jumpPressed, slidePressed: slidePressed || slideBuffer > 0 }, yaw, elapsed, arena.blockers);
     jumpPressed = false;
     slidePressed = false;
+    slideBuffer = Math.max(0, slideBuffer - rawElapsed);
+    if (prior.slideRemaining === 0 && player.slideRemaining > 0) slideBuffer = 0;
+    const isSliding = player.slideRemaining > 0;
+    element<HTMLElement>('slideStatus').hidden = !isSliding;
+    element<HTMLElement>('speedLines').classList.toggle('active', isSliding && !reducedMotion.matches);
     lastWalkAmount = Math.hypot(player.x - prior.x, player.z - prior.z) / Math.max(elapsed, 0.001) / 6;
-    const eyeTarget = player.slideRemaining > 0 ? 1.13 : 1.72;
-    bobEye += (eyeTarget - bobEye) * Math.min(elapsed * 12, 1);
+    const eyeTarget = isSliding ? 1.02 : 1.72;
+    bobEye += (eyeTarget - bobEye) * Math.min(elapsed * 19, 1);
     arena.camera.position.set(player.x, bobEye + player.lift, player.z);
     arena.camera.rotation.set(pitch, yaw, 0, 'YXZ');
+    const targetFov = isSliding ? 82 : sprint && (forward !== 0 || right !== 0) ? 78 : 74;
+    const nextFov = arena.camera.fov + (targetFov - arena.camera.fov) * Math.min(elapsed * 8, 1);
+    if (Math.abs(nextFov - arena.camera.fov) > 0.02) {
+      arena.camera.fov = nextFov;
+      arena.camera.updateProjectionMatrix();
+    }
     if (fireHeld) shoot(timeMs / 1000);
     if (reloading > 0) {
       reloading -= elapsed;
@@ -296,7 +333,7 @@ function loop(timeMs: number): void {
   arena.update(paused ? elapsed * 0.18 : elapsed, paused ? visibleTime * 0.16 : gameTime, lastWalkAmount, player.slideRemaining > 0);
   if (bloom.enabled) composer.render();
   else renderer.render(arena.scene, arena.camera);
-  updateMetrics(elapsed);
+  updateMetrics(rawElapsed);
 }
 
 deployButton.addEventListener('click', () => { void deploy(); });
@@ -306,7 +343,7 @@ element('tutorialButton').addEventListener('click', openManual);
 element('closeManual').addEventListener('click', () => manualDialog.close());
 element('pauseButton').addEventListener('click', pauseGame);
 element('engineeringButton').addEventListener('click', toggleEngineering);
-qualitySelect.addEventListener('change', () => { resize(); });
+qualitySelect.addEventListener('change', () => { autoTierOverride = null; strugglingSeconds = 0; resize(); });
 soundButton.addEventListener('click', () => {
   void audio.setEnabled(!audio.enabled).then(() => {
     soundButton.textContent = audio.enabled ? '♫ SOUND ON' : '♫ SOUND OFF';
@@ -333,7 +370,10 @@ document.addEventListener('keydown', (event) => {
   if (paused) return;
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code)) event.preventDefault();
   if (event.code === 'Space' && !event.repeat) jumpPressed = true;
-  if ((event.code === 'KeyC' || event.code === 'ControlLeft') && !event.repeat) slidePressed = true;
+  if ((event.code === 'KeyC' || event.code === 'ControlLeft') && !event.repeat) {
+    slidePressed = true;
+    slideBuffer = 0.2;
+  }
   if (event.code === 'KeyR' && !event.repeat) reload();
   keys.add(event.code);
 });

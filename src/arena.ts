@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { Blocker } from './simulation';
 
 export type GraphicsTier = 'low' | 'medium' | 'high';
@@ -63,6 +64,7 @@ export class RelayNineArena {
 
   private readonly raycaster = new THREE.Raycaster();
   private readonly solidSurfaces: THREE.Object3D[] = [];
+  private readonly staticArchitecture: THREE.Mesh[] = [];
   private readonly drones: Drone[] = [];
   private readonly impacts: Impact[] = [];
   private readonly animatedRings: { ring: THREE.Mesh; speed: number }[] = [];
@@ -98,6 +100,7 @@ export class RelayNineArena {
     this.buildDrones();
     this.buildWeapon();
     this.particleField = this.buildParticles();
+    this.batchStaticArchitecture();
   }
 
   private box(
@@ -108,7 +111,39 @@ export class RelayNineArena {
     mesh.position.set(x, y, z);
     parent.add(mesh);
     if (solid) this.solidSurfaces.push(mesh);
+    // Top-level, non-collidable architecture does not need its own draw call.
+    if (parent === this.scene && !solid) this.staticArchitecture.push(mesh);
     return mesh;
+  }
+
+  private batchStaticArchitecture(): void {
+    const batches = new Map<THREE.Material, THREE.Mesh[]>();
+    for (const mesh of this.staticArchitecture) {
+      const material = mesh.material as THREE.Material;
+      const existing = batches.get(material) ?? [];
+      existing.push(mesh);
+      batches.set(material, existing);
+    }
+    for (const [material, meshes] of batches) {
+      if (meshes.length < 2) continue;
+      const geometryParts = meshes.map((mesh) => {
+        mesh.updateMatrix();
+        const geometry = mesh.geometry.clone();
+        geometry.applyMatrix4(mesh.matrix);
+        return geometry;
+      });
+      const merged = mergeGeometries(geometryParts, false);
+      for (const part of geometryParts) part.dispose();
+      if (!merged) throw new Error('Unable to batch arena architecture.');
+      for (const mesh of meshes) {
+        this.scene.remove(mesh);
+        mesh.geometry.dispose();
+      }
+      const combined = new THREE.Mesh(merged, material);
+      combined.name = `Batched static architecture (${meshes.length} pieces)`;
+      this.scene.add(combined);
+    }
+    this.staticArchitecture.length = 0;
   }
 
   private strip(x: number, y: number, z: number, w: number, h: number, d: number, warm = false): void {

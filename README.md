@@ -2,7 +2,7 @@
 
 **A playable first-person 3D target range built as the foundation for a tactical cyberpunk FPS.**
 
-> **Status:** Private development milestone **0.1 — First Contact**. This is a movement, environment, and shooting prototype. The Cyber Scanner, defensive shield, enemy attacks, adaptive director, boss, and full campaign are *planned*, not implemented.
+> **Status:** Private development milestone **0.2 — Performance & Identity**. This is a movement, environment, and shooting prototype. The Cyber Scanner, defensive shield, enemy attacks, adaptive director, boss, and full campaign are *planned*, not implemented.
 
 The internal design codename is *Ghost Signal*, but a different public-facing title will be selected before launch because a commercial game uses that name.
 
@@ -15,7 +15,7 @@ npm ci
 npm run dev
 ```
 
-Open the local address shown by Vite (normally **http://localhost:5173/**). In GitHub Codespaces, open the forwarded **5173** port. Click **Deploy Into Arena** to capture the mouse; press **Esc** to pause and release it. Choose **Field Manual** for an interactive control reference.
+Open the local address shown by Vite (normally **http://localhost:5173/**). In GitHub Codespaces, open the forwarded **5173** port. Click **Start Operation** to capture the mouse; press **Esc** to pause and release it. Choose **Field Manual** for a control reference.
 
 ### Controls
 
@@ -25,7 +25,7 @@ Open the local address shown by Vite (normally **http://localhost:5173/**). In G
 | Left mouse | Fire the ARC-7 Pulse Carbine |
 | Shift | Sprint |
 | Space | Jump |
-| C or Ctrl while sprinting | Slide |
+| C or Ctrl while moving | Slide (Shift not required) |
 | R | Reload |
 | Tab | Toggle local engineering metrics |
 | Esc | Pause and release mouse |
@@ -34,7 +34,9 @@ Open the local address shown by Vite (normally **http://localhost:5173/**). In G
 
 ### Quality and accessibility
 
-- Graphics presets: Auto, High, Medium, Low. Low disables bloom and ambient particles.
+- Graphics presets: Auto, High, Medium, Low. Auto defaults to a lightweight mode and steps down automatically after sustained low FPS. Bloom is only enabled on High; Low removes bloom and ambient particles. Render resolution is budgeted to avoid overwhelming high-DPI screens.
+- Static environment meshes are batched by material, cutting the arena from **431 to 121 meshes** and preserving its original geometry. This targets GPU draw-call overhead; performance will still depend on the browser and hardware acceleration.
+- The menu and combat HUD have an independent violet/lime visual identity instead of the BREACHWAVE-inspired SOC card layout. Sliding includes a visible camera drop, field-of-view change, and on-screen feedback.
 - Browser audio is **off by default** and only synthesized locally when switched on.
 - Respects `prefers-reduced-motion` (no bloom in reduced-motion mode).
 - The starting menu, tutorial, settings, and result notifications use accessible HTML controls and text cues.
@@ -69,7 +71,7 @@ The smoke test starts Vite, checks the menu and deployment flow, captures local 
 
 ## Roadmap
 
-1. **First Contact (current):** Core 3D scene, movement/sprint/jump/slide, pulse carbine, range targets, metrics, manual.
+1. **First Contact / Performance & Identity (current):** Core 3D scene, responsive movement/sprint/jump/slide, pulse carbine, range targets, metrics, manual, batched geometry, distinctive in-game HUD.
 2. **Threat Response:** Cyber Scanner, evidence-based classification, shield ability, mission objectives.
 3. **AI Director:** Explainable state machines, hostile behaviors, tactical adaptation, reproducible test seeds.
 4. **Visual Overhaul:** Optimized original models and textures, upgraded lighting/animation, enhanced audio.

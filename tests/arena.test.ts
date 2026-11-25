@@ -5,13 +5,21 @@ import { RelayNineArena } from '../src/arena.ts';
 
 test('Relay Nine creates a navigable 3D scene with a visible core and training drones', () => {
   const arena = new RelayNineArena();
-  assert.ok(arena.scene.children.length > 50);
+  assert.ok(arena.scene.children.length > 30, 'Batched world should still contain interactive scene elements');
   assert.ok(arena.blockers.length > 3);
   assert.equal(arena.activeHostiles, 4);
   assert.ok(arena.scene.fog);
   assert.ok(arena.camera.parent === arena.scene);
   arena.setGraphicsTier('low');
   arena.update(0.016, 1, 0, false);
+});
+
+test('static geometry batching reduces GPU draw calls without reducing world detail', () => {
+  const arena = new RelayNineArena();
+  let meshCount = 0;
+  arena.scene.traverse((object) => { if (object instanceof THREE.Mesh) meshCount += 1; });
+  assert.ok(meshCount < 140, `Expected fewer than 140 meshes, got ${meshCount}`);
+  assert.ok(arena.scene.children.length < 90, 'Batched scenery should reduce scene traversal');
 });
 
 test('raycast shooting registers hostile hits and disables destroyed range drones', () => {

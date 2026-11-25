@@ -33,13 +33,24 @@ test('sprinting travels farther than walking over the same interval', () => {
   assert.ok(sprinting.z < walking.z);
 });
 
-test('slide requires forward motion, sprint, and grounding', () => {
+test('slide triggers while moving without requiring sprint', () => {
   const player = initialPlayer();
-  const sliding = advancePlayer(player, { ...forward, sprint: true, slidePressed: true }, 0, 0.016, []);
+  const sliding = advancePlayer(player, { ...forward, slidePressed: true }, 0, 0.016, []);
   assert.ok(sliding.slideRemaining > 0);
   assert.ok(sliding.z < player.z);
-  const idle = advancePlayer(player, { ...forward, forward: 0, sprint: true, slidePressed: true }, 0, 0.016, []);
+  const idle = advancePlayer(player, { ...forward, forward: 0, slidePressed: true }, 0, 0.016, []);
   assert.equal(idle.slideRemaining, 0);
+});
+
+test('slide has a visible duration, faster travel, and a cooldown to prevent spam', () => {
+  const base = initialPlayer();
+  const slide = advancePlayer(base, { ...forward, slidePressed: true }, 0, 0.016, []);
+  const walking = advancePlayer(base, forward, 0, 0.016, []);
+  assert.ok(slide.z < walking.z);
+  assert.ok(slide.slideRemaining > 0.85);
+  const noSpam = advancePlayer({ ...slide, slideRemaining: 0 }, { ...forward, slidePressed: true }, 0, 0.016, []);
+  assert.equal(noSpam.slideRemaining, 0);
+  assert.ok(noSpam.slideCooldown > 0);
 });
 
 test('jump lifts the player and gravity eventually returns them to the ground', () => {

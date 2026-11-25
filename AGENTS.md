@@ -18,6 +18,8 @@ This is a browser-first, single-player 3D FPS prototype for an AI-assisted cyber
 - Keep game playable without network access after its static assets have loaded; no analytics or backend calls.
 - Support reduced motion, sound off by default, visible text labels, and clear keyboard controls.
 - Preserve graphics presets and test the low preset for weaker systems.
+- Batch static geometry by material to keep draw calls low; do not silently replace the unique Relay Nine violet/lime HUD with BREACHWAVE-style SOC cards.
+- A slide triggers with C or Ctrl while moving, without requiring Shift, and must visibly lower the camera.
 - Run `npm run check` before committing.
 - Do not make the repository public or enable GitHub Pages without the owner's explicit approval.
 
@@ -32,4 +34,4 @@ This is a browser-first, single-player 3D FPS prototype for an AI-assisted cyber
 
 ## First milestone
 
-One arena, movement/sprint/jump/slide, energy carbine with reload, drone range, graphics options, local statistics and a developer metrics overlay. Campaign, scanner, shield, and adaptive adversary remain future work.
+One arena, movement/sprint/jump/slide, energy carbine with reload, drone range, optimized graphics options, local statistics and a developer metrics overlay. Campaign, scanner, shield, and adaptive adversary remain future work.

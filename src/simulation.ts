@@ -82,16 +82,17 @@ export function advancePlayer(
   next.slideCooldown = Math.max(0, next.slideCooldown - dt);
   const direction = movementDirection(input.forward, input.right, yaw);
 
-  if (input.slidePressed && input.sprint && next.grounded && next.slideCooldown === 0 &&
+  // A slide should work whenever the operator is moving on the ground; Shift is optional.
+  if (input.slidePressed && next.grounded && next.slideCooldown === 0 &&
       Math.hypot(direction.x, direction.z) > 0.1) {
-    next.slideRemaining = 0.72;
-    next.slideCooldown = 1.4;
+    next.slideRemaining = 0.94;
+    next.slideCooldown = 1.25;
     next.slideX = direction.x;
     next.slideZ = direction.z;
   }
 
   const sliding = next.slideRemaining > 0;
-  const speed = sliding ? 11.8 : input.sprint ? 8.8 : 5.8;
+  const speed = sliding ? 12.6 : input.sprint ? 8.8 : 5.8;
   const dx = (sliding ? next.slideX : direction.x) * speed * dt;
   const dz = (sliding ? next.slideZ : direction.z) * speed * dt;
 

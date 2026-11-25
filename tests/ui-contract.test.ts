@@ -16,10 +16,18 @@ test('every UI reference in the game controller exists in the HTML', () => {
 
 test('field manual and initial range have discoverable instructions', () => {
   assert.match(html, /FIELD MANUAL/);
-  assert.match(html, /DEPLOY INTO ARENA/);
+  assert.match(html, /START OPERATION/);
   assert.match(html, /id="qualitySelect"/);
   assert.match(html, /id="restartButton"/);
   assert.match(html, /press Esc/i);
+});
+
+test('Relay Nine uses a distinct combat HUD identity and visible slide cue', () => {
+  const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8');
+  assert.match(css, /--lime:\s*#e6ff7b/i);
+  assert.match(css, /--violet:\s*#aa8dff/i);
+  assert.match(html, /id="slideStatus"/);
+  assert.match(html, /id="fpsChip"/);
 });
 
 test('the prototype distinguishes shipped mechanics from future work', () => {
