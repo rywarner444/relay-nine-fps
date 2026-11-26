@@ -12,10 +12,10 @@ export interface MissionDefinition {
 export const MISSIONS: readonly MissionDefinition[] = [
   {
     number: '01', name: 'BASE FLOOR', codename: 'RETRIEVE / RESTORE',
-    briefing: 'Defeat the lime-marked carrier drones, collect all three green network fragments, then follow the dotted route on your radar to the upload computer.',
+    briefing: 'Defeat the three drones with bright-green halos, collect their green network fragments, then follow the dotted route on your radar to the green-lit upload computer.',
     lesson: 'Threat response: collect verified artifacts before restoring a service.',
     instructions: [
-      'Fight through the base floor. The three drones with lime halos carry network fragments.',
+      'Fight through the base floor. The three drones with bright-green halos carry network fragments.',
       'When a carrier falls, approach its green drop and press E when the pickup prompt appears.',
       'After collecting all three, follow the dotted lime route on your minimap to the computer. Press E to insert them.',
     ],
@@ -78,7 +78,7 @@ export function missionProgress(state: CampaignState): { current: number; total:
       label: collected ? '3 FRAGMENTS SECURED · UPLOAD PENDING' : 'FRAGMENT RECOVERY · 3 REQUIRED',
       title: collected ? 'Reach the upload computer' : 'Recover three network fragments',
       hint: collected ? 'All 3 fragments secured. Follow the dotted LIME route on your minimap to the computer, then press E when prompted.'
-        : 'Find the three drones with LIME halos. Shoot them, approach their green drops, and press E when the PICK UP prompt appears.',
+        : 'Find the three drones with GREEN halos. Shoot them, approach their green drops, and press E when the PICK UP prompt appears.',
     };
   }
   if (state.mission === 1) return {

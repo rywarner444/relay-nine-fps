@@ -36,6 +36,12 @@ test('Relay Nine uses a distinct combat HUD identity and visible slide cue', () 
   assert.match(html, /id="healthFill"/);
   assert.match(html, /id="sensitivityRange"/);
   assert.match(html, /id="interactionPrompt"/);
+  assert.match(html, /id="reloadIndicator"[^>]*role="status"/);
+  assert.match(html, /id="reloadArc"/);
+  assert.match(html, /id="reloadPercent"/);
+  assert.match(controller, /setReloadProgress\(active \? progress : null\)/);
+  assert.match(css, /\.telemetry-panel \.engineering-toggle \{ position: static/);
+  assert.match(html, /class="engineering-toggle" id="engineeringButton"[^>]*hidden>[\s\S]*?<\/button>[\s\S]*?<\/section>/);
   assert.match(html, /id="minimapRouteHint"/);
   assert.match(html, /id="missionBriefing"/);
   assert.match(html, /id="briefingDeploy"/);

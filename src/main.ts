@@ -30,6 +30,9 @@ const engineeringPanel = element<HTMLElement>('engineeringPanel');
 const qualitySelect = element<HTMLSelectElement>('qualitySelect');
 const soundButton = element<HTMLButtonElement>('soundButton');
 const ammoTrack = element<HTMLElement>('ammoTrack');
+const reloadIndicator = element<HTMLElement>('reloadIndicator');
+const reloadPercent = element<HTMLElement>('reloadPercent');
+const reloadArc = document.querySelector<SVGCircleElement>('#reloadArc')!;
 const minimapCanvas = element<HTMLCanvasElement>('minimapCanvas');
 const minimapContext = minimapCanvas.getContext('2d');
 const sensitivityRange = element<HTMLInputElement>('sensitivityRange');
@@ -78,6 +81,8 @@ let slideBuffer = 0;
 let lastFireTime = 0;
 let ammo = 30;
 let reloading = 0;
+const RELOAD_SECONDS = 1.35;
+const RELOAD_RING_CIRCUMFERENCE = 2 * Math.PI * 30;
 let lastTime = performance.now();
 let gameTime = 0;
 let visibleTime = 0;
@@ -121,6 +126,7 @@ function setVisibleGameHud(visible: boolean): void {
   element<HTMLElement>('capturePanel').hidden = true;
   element<HTMLElement>('bossPanel').hidden = !visible || campaign.mission !== 2;
   if (!visible) element<HTMLElement>('interactionPrompt').hidden = true;
+  if (!visible) reloadIndicator.hidden = true;
   if (!visible) engineeringPanel.hidden = true;
 }
 
@@ -350,7 +356,7 @@ function drawMinimap(): void {
 }
 
 function updateAmmo(): void {
-  element('ammoValue').textContent = reloading > 0 ? '↻' : String(ammo).padStart(2, '0');
+  element('ammoValue').textContent = String(ammo).padStart(2, '0');
   ammoTrack.innerHTML = '';
   const lit = Math.round(ammo / 30 * 15);
   for (let i = 0; i < 15; i += 1) {
@@ -358,6 +364,17 @@ function updateAmmo(): void {
     cell.className = i < lit ? 'charged' : '';
     ammoTrack.append(cell);
   }
+}
+
+function updateReloadIndicator(): void {
+  const active = reloading > 0;
+  reloadIndicator.hidden = !active || paused;
+  const progress = active ? Math.max(0, Math.min(1, 1 - reloading / RELOAD_SECONDS)) : 0;
+  if (active) {
+    reloadArc.style.strokeDashoffset = String(RELOAD_RING_CIRCUMFERENCE * (1 - progress));
+    reloadPercent.textContent = `${Math.round(progress * 100)}%`;
+  }
+  arena.setReloadProgress(active ? progress : null);
 }
 
 function resolveTier(): GraphicsTier {
@@ -400,6 +417,7 @@ function enterMission(index: number): void {
   failureReason = '';
   ammo = 30;
   reloading = 0;
+  reloadIndicator.hidden = true;
   taskComplete = false;
   yaw = 0;
   pitch = -0.03;
@@ -514,10 +532,11 @@ function toggleEngineering(): void {
 }
 
 function reload(): void {
-  if (reloading > 0 || ammo === 30) return;
-  reloading = 1.35;
+  if (paused || reloading > 0 || ammo === 30) return;
+  reloading = RELOAD_SECONDS;
   audio.reload();
   updateAmmo();
+  updateReloadIndicator();
 }
 
 function shoot(now: number): void {
@@ -666,6 +685,7 @@ function loop(timeMs: number): void {
     if (reloading > 0) {
       reloading -= elapsed;
       if (reloading <= 0) { ammo = 30; reloading = 0; updateAmmo(); }
+      updateReloadIndicator();
     }
   }
   const incomingDamage = arena.update(paused ? elapsed * 0.18 : elapsed, paused ? visibleTime * 0.16 : gameTime,

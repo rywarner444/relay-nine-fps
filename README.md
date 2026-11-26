@@ -2,7 +2,7 @@
 
 **A three-level cyberpunk browser FPS designed to showcase AI-assisted game engineering, procedural 3D environments, deterministic enemy AI, and cybersecurity-inspired mechanics.**
 
-> **Private development build 0.6 — Combat and Clarity.** Separate 3D levels, 14 faster-firing opponents on Mission 01, collectible network artifacts with large pickup prompts, a collision-aware dotted minimap route to the upload computer, hold-the-zone uplinks with cleared-ring feedback, concise pre-level briefings, a mobile 110-HP final boss, checkpoint retries, and a campaign achievement. The fictional adversaries use scripted game logic; trained/adaptive AI, real security evidence analysis, and online LLM integration are **not implemented**.
+> **Private development build 0.7 — Combat Readability.** Separate 3D levels, **18** faster-firing opponents on Mission 01, distinctly bright-green carrier halos and artifact pickups, a visible radial reload gauge with a weapon-lowering animation, an opaque depth-tested ARC-7 carbine, and an integrated Engineering View button. Earlier additions remain: proximity pickup prompts, a walkable dotted minimap route to the upload computer, three defended uplink captures, concise pre-level briefings, a mobile 110-HP final boss, checkpoint retries, and a campaign achievement. The fictional adversaries use scripted game logic; trained/adaptive AI, real security evidence analysis, and online LLM integration are **not implemented**.
 
 The internal creative codename is *Ghost Signal*. The user-facing title is Relay Nine.
 
@@ -21,7 +21,7 @@ Open the Vite URL, usually **http://localhost:5173/**. In GitHub Codespaces, go 
 
 | Mission | Distinct map | Player objective | Cybersecurity / engineering theme |
 |---|---|---|---|
-| **01 / Base Floor** | Network operations floor, server racks, real corridors and side wings | Fight through **14** faster-firing patrol drones. The three with **lime halos** drop green network fragments when destroyed. A large **E** prompt appears when you approach each drop. Collect all three; then follow the **lime dotted path on the minimap** to the computer and press **E** to upload. | Artifact recovery, threat classification, restoration workflow |
+| **01 / Base Floor** | Network operations floor, server racks, real corridors and side wings | Fight through **18** faster-firing patrol drones. The three with **bright-green halos** drop equally green network fragments when destroyed. A large **E** prompt appears when you approach each drop. Collect all three; then follow the **lime dotted path on the minimap** to the green-lit computer and press **E** to upload. | Artifact recovery, threat classification, restoration workflow |
 | **02 / Signal Foundry** | Industrial refinery floor with pipe tanks, new partitions and wide flanking lanes | Reach three separate purple **uplink towers**. Remain in each tower's glowing **7.5m radius for 9 seconds** to charge it to 100%. Keep fighting while capturing. The captured tower **and floor ring both disappear**; the capture HUD appears only inside an active ring. **No E key** needed. | Infrastructure resilience, availability under pressure |
 | **03 / Sentinel Arena** | Open circular combat arena with cover and crimson warning lights | **Defeat Aegis-9**, a mobile 110-HP mech. An obvious top-screen health bar tracks armor. Four escort drones defend it, additional drones spawn on timers, and defeated escorts respawn. Killing the Sentinel is the **only** objective. | Threat prioritization, adversarial systems, resource management |
 
@@ -29,14 +29,14 @@ Completing the final fight unlocks an in-game **GHOST PROTOCOL** achievement and
 
 ### Combat and navigation
 
-- Hostile drones move through patrol routes, acquire targets in range, obey line-of-sight checks, and launch visible energy missiles. Mission 01 starts with fourteen hostiles; its fire interval is 1.65 seconds, significantly quicker than the prior 2.1 seconds. Subsequent levels add escalating pressure through faster projectiles and reinforcement timers. Cover stops projectiles; movement and sliding help evade them.
-- The ARC-7 carbine is built from detailed beveled geometry and physically based materials. Hitmarkers, recoil, reloads, large proximity-based pickup/insert prompts, colored beacons, the waypoint direction/distance display, and the tactical minimap keep combat legible.
+- Hostile drones move through patrol routes, acquire targets in range, obey line-of-sight checks, and launch visible energy missiles. Mission 01 starts with **18** hostiles; its fire interval is 1.65 seconds, significantly quicker than the prior 2.1 seconds. Subsequent levels add escalating pressure through faster projectiles and reinforcement timers. Cover stops projectiles; movement and sliding help evade them.
+- The ARC-7 carbine is built from detailed opaque, depth-tested beveled geometry and physically based materials. Its **1.35-second reload** displays a circular percentage meter near the reticle and briefly lowers/tilts the gun, returning to normal when ready. Hitmarkers, recoil, large proximity-based pickup/insert prompts, green evidence beacons, the waypoint direction/distance display, and the tactical minimap keep combat legible.
 - Each mission starts with **100 health** and full ammo. Losing all health produces a **Defeat** menu with **Retry Mission 0X**—you do **not** have to replay missions you've already passed. Score and elapsed time reset to the start of that mission when retrying.
 - Completing missions 01 and 02 saves the **highest unlocked level number** (0, 1, or 2) to `localStorage` in the same browser. Returning players can continue their latest unlocked mission from the intro screen, or choose to restart from level 01. This is a local checkpoint, **not cloud sync**; clearing site data erases the preference.
 - The boss fight displays a dedicated red armor bar (`110 / 110`) and periodically introduces reinforcement drones at predetermined times while the Sentinel is alive.
 - The earlier amber maintenance drone was removed because it was distracting and had no meaningful role. The unused network-integrity meter was replaced with a live hostile-contact count.
 - When the third fragment is collected, the radar calculates a **walkable route around real walls and cover**, drawing it as a luminous dashed line from the player toward the upload computer. That route is deliberately **absent** during other objectives and missions.
-- The old red full-screen damage overlay was removed. Damage feedback now pulses the health bar, and the bottom-left engineering/vitals HUD has an opaque dark background to avoid distracting red bleed-through.
+- The old red full-screen damage overlay was removed. Damage feedback now pulses the health bar; Engineering View now sits **inside** the opaque Operator Vitals panel instead of floating over an unrelated dark rectangular backdrop.
 
 ### Controls
 
@@ -94,8 +94,9 @@ The smoke tool may require a `CHROMIUM_PATH` environment variable; the CI unit/b
 2. **v0.3 / Signal Campaign:** initial three-mission scenario, waypoint objectives and Sentinel prototype.
 3. **v0.4 / Facility Assault:** expanded base-floor corridors and cover, incoming hostile projectiles, health/radar, configurable mouse sensitivity, advanced weapon and mech models.
 4. **v0.5 / Three Distinct Fronts:** independently instantiated 3D maps, carrier fragment drops, charged uplink defense, multi-wave mobile boss encounter with highly visible HP, same-stage defeat retries, local stage unlocks, final achievement.
-5. **v0.6 / Combat and Clarity (current):** denser and faster Mission 01 combat; clear fragment/console interactions; collision-aware dotted minimap guidance; complete uplink-floor cleanup; mission-intel briefing screens; retired maintenance decoy and integrity meter; streamlined health-only damage feedback.
-6. **Future:** device-specific performance tuning, audio/FX improvements, additional original 3D/PBR models, gamepad and accessibility polish, gameplay trailer, owner-approved privacy audit and optional public GitHub Pages launch.
+5. **v0.6 / Combat and Clarity:** denser and faster Mission 01 combat; clear fragment/console interactions; collision-aware dotted minimap guidance; complete uplink-floor cleanup; mission-intel briefing screens; retired maintenance decoy and integrity meter; streamlined health-only damage feedback.
+6. **v0.7 / Combat Readability (current):** increased Base Floor to 18 hostiles; matched three artifact/carrier markers and the upload computer to clearly green 3D highlights; added radial reload meter and carbine motion; corrected firearm depth testing and connected its chassis; integrated engineering toggle into vitals to eliminate the floating background artifact.
+7. **Future:** device-specific performance tuning, audio/FX improvements, additional original 3D/PBR models, gamepad and accessibility polish, gameplay trailer, owner-approved privacy audit and optional public GitHub Pages launch.
 
 ## Privacy and AI disclosure
 

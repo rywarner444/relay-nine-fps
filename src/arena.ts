@@ -71,6 +71,7 @@ const COLOR = {
   cyanDeep: 0x087892,
   magenta: 0xfa3d87,
   orange: 0xffbf56,
+  fragmentGreen: 0x26ff82,
   dark: 0x07101b,
 };
 
@@ -149,6 +150,7 @@ export class RelayNineArena {
   private readonly dataPackets: { mesh: THREE.Mesh; progress: number; speed: number; rail: number }[] = [];
   private readonly particleField: THREE.Points;
   private weaponKick = 0;
+  private reloadAnimation = 0;
   private muzzleTime = 0;
   private readonly coreLight: THREE.PointLight;
   private readonly ambientLight: THREE.HemisphereLight;
@@ -514,6 +516,10 @@ export class RelayNineArena {
       { id: 'I-12', x: 25, y: 2.9, z: 32, phase: 7.5, hostile: true, route: [[25, 32], [31, 30], [30, 20], [23, 20]] },
       { id: 'I-13', x: -6, y: 3.2, z: -47, phase: 8.2, hostile: true, route: [[-6, -47], [-8, -50], [-2, -50], [-2, -45]] },
       { id: 'I-14', x: 25, y: 2.8, z: -35, phase: 8.9, hostile: true, route: [[25, -35], [29, -29], [29, -18], [23, -18]] },
+      { id: 'I-15', x: -26, y: 3, z: 31, phase: 9.6, hostile: true, route: [[-26, 31], [-31, 26], [-26, 15], [-22, 18]] },
+      { id: 'I-16', x: 27, y: 3, z: -3, phase: 10.2, hostile: true, route: [[27, -3], [23, 8], [30, 14], [32, 2]] },
+      { id: 'I-17', x: -25, y: 2.8, z: -37, phase: 10.8, hostile: true, route: [[-25, -37], [-30, -32], [-28, -23], [-22, -27]] },
+      { id: 'I-18', x: 5, y: 3, z: -39, phase: 11.5, hostile: true, route: [[5, -39], [-5, -38], [-3, -47], [5, -47]] },
     ];
     const foundry: Spec[] = [
       { id: 'I-11', x: -27, y: 3, z: 30, phase: 0.3, hostile: true, respawnDelay: 7, route: [[-27, 30], [-30, 12], [-21, 15]] },
@@ -547,7 +553,7 @@ export class RelayNineArena {
       const eye = new THREE.Mesh(new THREE.SphereGeometry(0.29, 16, 10), glow);
       eye.position.z = spec.hostile ? 0.77 : 0.5;
       group.add(eye);
-      const halo = new THREE.Mesh(new THREE.TorusGeometry(1.15, 0.07, 9, 32), spec.dropId ? new THREE.MeshBasicMaterial({ color: 0xe6ff7b }) : glow);
+      const halo = new THREE.Mesh(new THREE.TorusGeometry(1.15, 0.095, 9, 32), spec.dropId ? new THREE.MeshBasicMaterial({ color: COLOR.fragmentGreen, toneMapped: false }) : glow);
       halo.rotation.x = 0.12;
       group.add(halo);
       const rim = new THREE.Mesh(new THREE.TorusGeometry(0.93, 0.13, 8, 28), darkMetal);
@@ -574,6 +580,31 @@ export class RelayNineArena {
         const foot = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.12, 0.48), darkMetal);
         foot.position.y = -0.85;
         group.add(foot);
+      }
+
+      // Every drone moves as one unit. Merge its static shell/wing/engine parts
+      // per material, but keep the halo separate for its rotation animation.
+      // This keeps the expanded patrol count cheaper to render on low presets.
+      const batches = new Map<THREE.Material, THREE.Mesh[]>();
+      for (const child of group.children) {
+        if (!(child instanceof THREE.Mesh) || child === halo) continue;
+        const items = batches.get(child.material as THREE.Material) ?? [];
+        items.push(child);
+        batches.set(child.material as THREE.Material, items);
+      }
+      for (const [material, parts] of batches) {
+        if (parts.length < 2) continue;
+        const components = parts.map((part) => {
+          part.updateMatrix();
+          const geometry = part.geometry.index ? part.geometry.toNonIndexed() : part.geometry.clone();
+          geometry.applyMatrix4(part.matrix);
+          return geometry;
+        });
+        const merged = mergeGeometries(components, false);
+        for (const component of components) component.dispose();
+        if (!merged) throw new Error('Unable to batch patrol drone components.');
+        for (const part of parts) { group.remove(part); part.geometry.dispose(); }
+        group.add(new THREE.Mesh(merged, material));
       }
 
       const meshes: THREE.Object3D[] = [];
@@ -678,7 +709,7 @@ export class RelayNineArena {
   private buildShutdownConsole(): THREE.Group {
     const group = new THREE.Group();
     group.position.set(0, 0, -47);
-    const green = new THREE.MeshBasicMaterial({ color: 0xe6ff7b, toneMapped: false });
+    const green = new THREE.MeshBasicMaterial({ color: COLOR.fragmentGreen, toneMapped: false });
     this.scene.add(group);
     this.box(0, 1.2, 0, 1.8, 2.4, 0.9, darkMetal, group);
     this.box(0, 1.7, 0.52, 1.4, 0.85, 0.08, green, group);
@@ -687,9 +718,9 @@ export class RelayNineArena {
     ring.rotation.x = Math.PI / 2;
     ring.position.y = 0.11;
     group.add(ring);
-    // Tall lime locator makes the upload station readable from the approach corridor.
+    // Tall green locator makes the upload station readable from the approach corridor.
     const beacon = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.22, 6.1, 10),
-      new THREE.MeshBasicMaterial({ color: 0xe6ff7b, transparent: true, opacity: 0.26, depthWrite: false }));
+      new THREE.MeshBasicMaterial({ color: COLOR.fragmentGreen, transparent: true, opacity: 0.26, depthWrite: false }));
     beacon.position.y = 4.1;
     group.add(beacon);
     const locator = new THREE.Mesh(new THREE.OctahedronGeometry(0.9), green);
@@ -699,7 +730,7 @@ export class RelayNineArena {
       this.box(side * 1.4, 2.35, 0.28, 0.12, 4.7, 0.1, green, group);
       this.box(side * 1.4, 4.7, 0.28, 0.6, 0.12, 0.1, green, group);
     }
-    const ambient = new THREE.PointLight(0xe6ff7b, 23, 18, 2);
+    const ambient = new THREE.PointLight(COLOR.fragmentGreen, 23, 18, 2);
     ambient.position.y = 3.5;
     group.add(ambient);
     group.visible = false;
@@ -717,11 +748,13 @@ export class RelayNineArena {
 
   private buildWeapon(): void {
     this.camera.add(this.weapon);
-    const receiver = new THREE.MeshStandardMaterial({ color: 0x71879b, metalness: 0.94, roughness: 0.23, map: grungeTexture, depthTest: false });
-    const carbon = new THREE.MeshStandardMaterial({ color: 0x17232c, metalness: 0.58, roughness: 0.63, depthTest: false });
-    const ceramic = new THREE.MeshStandardMaterial({ color: 0x354f65, metalness: 0.82, roughness: 0.31, depthTest: false });
-    const accent = new THREE.MeshStandardMaterial({ color: 0xb0a1ff, metalness: 0.47, roughness: 0.36, depthTest: false });
-    const energy = new THREE.MeshBasicMaterial({ color: 0x84f5ff, toneMapped: false, depthTest: false });
+    // Depth-tested, depth-writing opaque parts occlude one another. Without this,
+    // material-batched receiver pieces appear see-through and disconnected.
+    const receiver = new THREE.MeshStandardMaterial({ color: 0x9daec0, metalness: 0.63, roughness: 0.38, map: grungeTexture, emissive: 0x18263a, emissiveIntensity: 0.26 });
+    const carbon = new THREE.MeshStandardMaterial({ color: 0x263542, metalness: 0.36, roughness: 0.6, emissive: 0x0d1825, emissiveIntensity: 0.2 });
+    const ceramic = new THREE.MeshStandardMaterial({ color: 0x516f86, metalness: 0.58, roughness: 0.4, emissive: 0x102339, emissiveIntensity: 0.24 });
+    const accent = new THREE.MeshStandardMaterial({ color: 0xa79be1, metalness: 0.35, roughness: 0.42 });
+    const energy = new THREE.MeshBasicMaterial({ color: 0x84f5ff, toneMapped: false });
     const add = (geometry: THREE.BufferGeometry, x: number, y: number, z: number, mat: THREE.Material): THREE.Mesh => {
       const mesh = new THREE.Mesh(geometry, mat);
       mesh.position.set(x, y, z);
@@ -736,7 +769,8 @@ export class RelayNineArena {
       return mesh;
     };
 
-    rounded(0, -0.035, -0.31, 0.25, 0.22, 0.65, receiver); // upper receiver
+    rounded(0, -0.035, -0.31, 0.31, 0.26, 0.7, receiver); // connected upper receiver
+    rounded(0, -0.045, -0.56, 0.23, 0.20, 0.56, carbon); // continuous central gun chassis
     rounded(0, -0.16, -0.14, 0.19, 0.17, 0.35, ceramic); // lower receiver
     rounded(0, -0.31, -0.025, 0.13, 0.33, 0.17, carbon).rotation.x = -0.18; // angled grip
     rounded(0, -0.215, -0.39, 0.16, 0.3, 0.21, accent).rotation.x = 0.13; // rechargeable magazine
@@ -785,6 +819,11 @@ export class RelayNineArena {
     this.muzzleFlash.visible = false;
     this.weapon.position.set(0.48, -0.39, -0.68);
     this.weapon.traverse((obj) => { if (obj instanceof THREE.Mesh) obj.renderOrder = 30; });
+  }
+
+  /** Driven by the HUD reload timer; does not require extra skeletal meshes. */
+  setReloadProgress(progress: number | null): void {
+    this.reloadAnimation = progress === null ? 0 : Math.sin(Math.max(0, Math.min(1, progress)) * Math.PI);
   }
 
   private buildParticles(): THREE.Points {
@@ -869,16 +908,16 @@ export class RelayNineArena {
   private spawnFragment(id: string, position: THREE.Vector3): void {
     const group = new THREE.Group();
     group.position.set(position.x, 0, position.z);
-    const lime = new THREE.MeshBasicMaterial({ color: 0xe6ff7b, toneMapped: false });
-    const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.63), lime);
+    const green = new THREE.MeshBasicMaterial({ color: COLOR.fragmentGreen, toneMapped: false });
+    const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.63), green);
     crystal.position.y = 1.05;
     group.add(crystal);
-    const base = new THREE.Mesh(new THREE.TorusGeometry(1.18, 0.11, 7, 32), lime);
+    const base = new THREE.Mesh(new THREE.TorusGeometry(1.18, 0.11, 7, 32), green);
     base.position.y = 0.15;
     base.rotation.x = Math.PI / 2;
     group.add(base);
     const beacon = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 3.7, 9),
-      new THREE.MeshBasicMaterial({ color: 0xbaff6b, transparent: true, opacity: 0.27, depthWrite: false }));
+      new THREE.MeshBasicMaterial({ color: COLOR.fragmentGreen, transparent: true, opacity: 0.27, depthWrite: false }));
     beacon.position.y = 1.85;
     group.add(beacon);
     this.scene.add(group);
@@ -903,14 +942,14 @@ export class RelayNineArena {
       if (!fragment) return null;
       fragment.collected = true;
       fragment.group.visible = false;
-      this.spawnImpact(fragment.position.clone().add(new THREE.Vector3(0, 1, 0)), 0xe6ff7b, 0.9);
+      this.spawnImpact(fragment.position.clone().add(new THREE.Vector3(0, 1, 0)), COLOR.fragmentGreen, 0.9);
       if (this.fragments.length === 3 && this.fragments.every((piece) => piece.collected)) this.shutdownConsole.visible = true;
       return fragment.id;
     }
     if (interaction.kind === 'upload') {
       this.shutdownComplete = true;
       this.shutdownConsole.visible = false;
-      this.spawnImpact(this.shutdownConsole.position.clone().add(new THREE.Vector3(0, 2, 0)), 0xe6ff7b, 1.2);
+      this.spawnImpact(this.shutdownConsole.position.clone().add(new THREE.Vector3(0, 2, 0)), COLOR.fragmentGreen, 1.2);
       return 'UPLOAD';
     }
     return null;
@@ -1121,10 +1160,11 @@ export class RelayNineArena {
     this.weaponKick = Math.max(0, this.weaponKick - delta * 6.8);
     const bob = Math.sin(time * (sliding ? 19 : 12)) * Math.min(walking, 1) * 0.011;
     const targetX = 0.48 + Math.sin(time * 5.6) * Math.min(walking, 1) * 0.009;
-    const targetY = -0.39 + bob - (sliding ? 0.07 : 0) - this.weaponKick * 0.045;
+    const targetY = -0.39 + bob - (sliding ? 0.07 : 0) - this.weaponKick * 0.045 - this.reloadAnimation * 0.24;
     this.weapon.position.x += (targetX - this.weapon.position.x) * Math.min(delta * 12, 1);
     this.weapon.position.y += (targetY - this.weapon.position.y) * Math.min(delta * 12, 1);
-    this.weapon.rotation.x = this.weaponKick * 0.095;
+    this.weapon.rotation.x = this.weaponKick * 0.095 + this.reloadAnimation * 0.15;
+    this.weapon.rotation.z = -this.reloadAnimation * 0.22;
 
     for (let i = this.impacts.length - 1; i >= 0; i -= 1) {
       const impact = this.impacts[i];

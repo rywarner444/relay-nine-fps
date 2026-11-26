@@ -5,7 +5,7 @@ import { RelayNineArena } from '../src/arena.ts';
 
 test('the three mission maps have distinct navigable collision layouts and threat counts', () => {
   const levels = [new RelayNineArena(0), new RelayNineArena(1), new RelayNineArena(2)];
-  assert.deepEqual(levels.map((arena) => arena.activeHostiles), [14, 8, 5]);
+  assert.deepEqual(levels.map((arena) => arena.activeHostiles), [18, 8, 5]);
   const mapSignature = (arena: RelayNineArena): string => arena.blockers
     .map((b) => `${b.x},${b.z},${b.halfWidth}`).join('|');
   assert.equal(new Set(levels.map(mapSignature)).size, 3);
@@ -27,6 +27,26 @@ test('batched environments keep the first mission GPU mesh footprint controlled'
   arena.dispose();
 });
 
+test('the ARC-7 has opaque depth-tested geometry and a timed reload motion', () => {
+  const arena = new RelayNineArena(0);
+  const body = arena.weapon.children.filter((child) => child instanceof THREE.Mesh && child !== arena.muzzleFlash) as THREE.Mesh[];
+  assert.ok(body.length >= 4, 'Carbine retains visually distinct batched materials');
+  for (const part of body) {
+    const material = part.material as THREE.Material;
+    assert.equal(material.depthTest, true, 'Weapon layers must obey surface occlusion');
+    assert.equal(material.depthWrite, true, 'Weapon parts must conceal geometry behind them');
+    assert.equal(material.transparent, false, 'Carbine body must be opaque');
+  }
+  arena.setReloadProgress(0.5);
+  arena.update(0.1, 1, 0, false);
+  assert.ok(arena.weapon.position.y < -0.42, 'Reload motion lowers the carbine');
+  assert.ok(Math.abs(arena.weapon.rotation.z) > 0.15, 'Reload motion visibly tilts the carbine');
+  arena.setReloadProgress(null);
+  arena.update(0.5, 2, 0, false);
+  assert.ok(Math.abs(arena.weapon.rotation.z) < 0.001, 'Carbine recovers its normal stance');
+  arena.dispose();
+});
+
 test('carrier combat creates a world drop that needs proximity and E interaction', () => {
   const arena = new RelayNineArena(0);
   arena.camera.lookAt(new THREE.Vector3(-5, 2.8, 25));
@@ -35,21 +55,21 @@ test('carrier combat creates a world drop that needs proximity and E interaction
   const last = arena.fire();
   assert.equal(last.targetId, 'I-01');
   assert.equal(last.destroyed, true);
-  assert.equal(arena.activeHostiles, 13);
+  assert.equal(arena.activeHostiles, 17);
   assert.deepEqual(arena.getInteraction(-5, 25), { kind: 'fragment', id: 'FRAG-A' });
   assert.equal(arena.scanNearby(0, 42), null, 'Pickup cannot be collected remotely');
   assert.equal(arena.scanNearby(-5, 25), 'FRAG-A');
   assert.equal(arena.scanNearby(-5, 25), null, 'Pickup cannot be collected twice');
   assert.equal(arena.getWaypoint(-5, 25)?.id, 'CARRIER FRAG-C');
   arena.update(8, 8, 0, false);
-  assert.equal(arena.activeHostiles, 13, 'Initial mission enemies do not respawn');
+  assert.equal(arena.activeHostiles, 17, 'Initial mission enemies do not respawn');
   arena.dispose();
 });
 
 test('mission 1 is fully hostile-only, with no unnecessary maintenance decoy', () => {
   const arena = new RelayNineArena(0);
   assert.equal(arena.tacticalBlips.filter((blip) => blip.type === 'friendly').length, 0);
-  assert.equal(arena.activeHostiles, 14);
+  assert.equal(arena.activeHostiles, 18);
   arena.dispose();
 });
 

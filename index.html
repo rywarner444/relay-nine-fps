@@ -30,7 +30,7 @@
       <section class="objective-panel hud-panel" id="objectivePanel" aria-label="Current objective" hidden>
         <div class="eyebrow"><span id="objectiveStep">01 / 03</span> <span class="thin-rule"></span> CURRENT DIRECTIVE</div>
         <h2 id="objectiveTitle">Recover network fragments</h2>
-        <p id="objectiveText">Defeat lime-marked carriers and collect their green drops with E.</p>
+        <p id="objectiveText">Defeat green-lit carriers and collect their green drops with E.</p>
         <div class="objective-progress"><span id="objectiveFill"></span></div>
         <div class="objective-progress-caption"><span id="objectiveCaption">FRAGMENT RECOVERY</span><strong id="objectiveCount">0 / 4 STEPS</strong></div>
       </section>
@@ -51,12 +51,20 @@
         <div class="metric-row"><span>HEALTH / ARMOR</span><strong id="healthValue">100 / 100</strong></div>
         <div class="health-bar"><span id="healthFill"></span></div>
         <div class="health-state" id="healthState">OPERATOR READY</div>
-        <div class="metric-row"><span>HOSTILE CONTACTS</span><strong id="hostileCount">14</strong></div>
+        <div class="metric-row"><span>HOSTILE CONTACTS</span><strong id="hostileCount">18</strong></div>
         <div class="metric-row second"><span>RANGE SCORE</span><strong id="scoreValue">0000</strong></div>
         <div class="metric-row second"><span>SHOT ACCURACY</span><strong id="accuracyValue">—</strong></div>
+        <button type="button" class="engineering-toggle" id="engineeringButton" aria-pressed="false" hidden>⌘ ENGINEERING VIEW <span class="keycap">TAB</span></button>
       </section>
 
       <div class="crosshair" id="crosshair" aria-hidden="true" hidden><i></i><i></i><i></i><i></i><span></span></div>
+      <div class="reload-indicator" id="reloadIndicator" role="status" aria-label="Weapon reloading" hidden>
+        <svg class="reload-dial" viewBox="0 0 80 80" aria-hidden="true" focusable="false">
+          <circle class="reload-dial-track" cx="40" cy="40" r="30"></circle>
+          <circle class="reload-dial-progress" id="reloadArc" cx="40" cy="40" r="30"></circle>
+        </svg>
+        <div class="reload-dial-text"><strong id="reloadPercent">0%</strong><span>RELOADING</span></div>
+      </div>
       <div class="hitmarker" id="hitmarker" aria-hidden="true" hidden><i></i><i></i><i></i><i></i></div>
       <div class="slide-status" id="slideStatus" aria-live="off" hidden>↠ SLIDE ENGAGED <span>EVASION BOOST</span></div>
       <div class="waypoint-panel" id="waypointPanel" aria-live="off" hidden>◈ NEAREST OBJECTIVE</div>
@@ -73,7 +81,6 @@
       </section>
 
       <div class="movement-hint" id="movementHint" hidden><span class="keycap">WASD</span> MOVE <span class="keycap">SHIFT</span> SPRINT <span class="keycap">C</span> SLIDE <span class="keycap">E</span> INTERACT <span class="keycap">ESC</span> SETTINGS</div>
-      <button type="button" class="engineering-toggle" id="engineeringButton" hidden>⌘ ENGINEERING VIEW <span class="keycap">TAB</span></button>
       <aside class="engineering-panel hud-panel" id="engineeringPanel" hidden aria-label="Engineering telemetry">
         <div class="eyebrow">ENGINEERING // LOCAL OBSERVABILITY</div>
         <dl><div><dt>Frame rate</dt><dd id="metricFps">—</dd></div><div><dt>Frame time</dt><dd id="metricFrame">—</dd></div><div><dt>Draw calls</dt><dd id="metricDraw">—</dd></div><div><dt>Player position</dt><dd id="metricPosition">—</dd></div><div><dt>Active hostile drones</dt><dd id="metricTargets">—</dd></div><div><dt>Graphics tier</dt><dd id="metricQuality">—</dd></div></dl>
@@ -83,7 +90,7 @@
       <section class="menu-overlay" id="menuOverlay" aria-label="Game menu">
         <div class="menu-backdrop"></div>
         <div class="menu-shell">
-          <div class="menu-header"><div class="menu-overline"><span class="menu-monogram">R<span>9</span></span><span>RELAY NINE <small>THE SIGNAL CAMPAIGN</small></span></div><span class="classification">BUILD 0.6 / PRIVATE DEVELOPMENT</span></div>
+          <div class="menu-header"><div class="menu-overline"><span class="menu-monogram">R<span>9</span></span><span>RELAY NINE <small>THE SIGNAL CAMPAIGN</small></span></div><span class="classification">BUILD 0.7 / PRIVATE DEVELOPMENT</span></div>
           <div class="menu-main">
             <div class="menu-title-area">
               <div class="sector-kicker"><span class="live-dot"></span> 3-MISSION MICRO CAMPAIGN <span class="number-stamp" id="menuMissionNumber">[ MISSION 01 / 03 ]</span></div>
@@ -122,10 +129,10 @@
       <dialog id="manualDialog" class="manual-dialog" aria-label="Field manual">
         <div class="manual-inner">
           <div class="manual-head"><div><span class="eyebrow">R9 / OPERATOR HANDBOOK</span><h2>FIELD MANUAL</h2></div><button id="closeManual" class="close-button" type="button" aria-label="Close field manual">✕</button></div>
-          <p><strong>01 / BASE FLOOR:</strong> Fight 14 magenta hostile drones; the three with <strong>lime halos</strong> carry network fragments. Each drops a glowing green piece. Move close for a large <kbd>E</kbd> pickup prompt. Once you have all three, <strong>follow the dotted lime route on your minimap to the computer</strong> and press <kbd>E</kbd> to insert them.</p>
+          <p><strong>01 / BASE FLOOR:</strong> Fight 18 magenta hostile drones; the three with <strong>bright-green halos</strong> carry network fragments. Each drops a glowing green piece. Move close for a large <kbd>E</kbd> pickup prompt. Once you have all three, <strong>follow the dotted lime route on your minimap to the green-lit computer</strong> and press <kbd>E</kbd> to insert them.</p>
           <p><strong>02 / SIGNAL FOUNDRY:</strong> Find three purple uplink towers. Stand inside a purple floor ring until it charges to 100%. Defend yourself during the hold. A secured tower <strong>and its ring both disappear</strong>. No E press needed.</p>
           <p><strong>03 / SENTINEL ARENA:</strong> Defeat the giant moving mech. Watch its large red health bar at the top of the screen. It has heavy armor and calls in new drones. Destroying the boss is the <strong>only objective</strong> and unlocks the final achievement.</p>
-          <p><strong>Survival:</strong> Every mission begins with a brief objective overview. Hostiles move and fire energy missiles. Sprint, slide and use cover; health resets at each level start. If you die, <strong>retry that level</strong>. Radar: red = enemy, violet = objectives, lime dotted path = computer after all fragments are found.</p>
+          <p><strong>Survival:</strong> Every mission begins with a brief objective overview. Hostiles move and fire energy missiles. Sprint, slide and use cover; health resets at each level start. Reload with <kbd>R</kbd> (or automatically on empty); the circular meter fills while the carbine lowers, then vanishes when ready. If you die, <strong>retry that level</strong>. Radar: red = enemy, violet = objectives, lime dotted path = computer after all fragments are found.</p>
           <div class="manual-grid"><div><kbd>W A S D</kbd><span>Move</span></div><div><kbd>MOUSE</kbd><span>Look / aim</span></div><div><kbd>LEFT CLICK</kbd><span>Fire weapon</span></div><div><kbd>SHIFT</kbd><span>Sprint</span></div><div><kbd>SPACE</kbd><span>Jump</span></div><div><kbd>C / CTRL</kbd><span>Slide while moving</span></div><div><kbd>E</kbd><span>Pick up / insert (level 01)</span></div><div><kbd>R</kbd><span>Reload</span></div><div><kbd>TAB</kbd><span>Engineering view</span></div><div><kbd>ESC</kbd><span>Pause / settings</span></div></div>
           <p class="manual-note">Graphics and sensitivity can be changed from the pause menu. Audio stays muted until enabled. Progress is stored locally in your browser; there are no accounts, APIs, or real security operations.</p>
           <button id="manualDeploy" class="primary-button" type="button">▶ ENTER MISSION</button>
