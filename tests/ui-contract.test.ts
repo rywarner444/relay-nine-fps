@@ -35,6 +35,11 @@ test('Relay Nine uses a distinct combat HUD identity and visible slide cue', () 
   assert.match(html, /id="minimapCanvas"/);
   assert.match(html, /id="healthFill"/);
   assert.match(html, /id="sensitivityRange"/);
+  assert.match(html, /id="interactionPrompt"/);
+  assert.match(html, /id="minimapRouteHint"/);
+  assert.match(html, /id="missionBriefing"/);
+  assert.match(html, /id="briefingDeploy"/);
+  assert.doesNotMatch(html, /id="damageFlash"/);
   assert.match(html, /id="capturePanel"/);
   assert.match(html, /id="captureFill"/);
   assert.match(html, /id="bossPanel"/);
@@ -42,7 +47,7 @@ test('Relay Nine uses a distinct combat HUD identity and visible slide cue', () 
   assert.match(html, /id="bossFill"/);
   assert.match(html, /id="achievementPanel"/);
   assert.match(html, /GHOST PROTOCOL/);
-  assert.match(html, /stay there until it charges to 100%/i);
+  assert.match(html, /ring until it charges to 100%/i);
 });
 
 test('the campaign distinguishes scripted game rules from real AI or security telemetry', () => {

@@ -138,6 +138,7 @@ export class RelayNineArena {
   private readonly staticArchitecture: THREE.Mesh[] = [];
   private readonly drones: Drone[] = [];
   private readonly terminals: MissionMarker[] = [];
+  private readonly captureZones = new Map<string, THREE.Group>();
   private readonly fragments: Fragment[] = [];
   private readonly impacts: Impact[] = [];
   private readonly enemyBolts: EnemyBolt[] = [];
@@ -446,16 +447,23 @@ export class RelayNineArena {
       this.strip(x, 2.34, z, 3.5, 0.08, 2.5);
       this.blockers.push({ x, z, halfWidth: 1.65, halfDepth: 1.2 });
     }
-    for (const [x, z] of [[-29, 18], [27, 6], [0, -30]]) {
+    for (const { id, x, z } of [
+      { id: 'TRACE-A', x: -29, z: 18 },
+      { id: 'TRACE-B', x: 27, z: 6 },
+      { id: 'TRACE-C', x: 0, z: -30 },
+    ]) {
+      const zone = new THREE.Group();
+      zone.position.set(x, 0, z);
+      this.scene.add(zone);
       const disk = new THREE.Mesh(new THREE.CylinderGeometry(CAPTURE_RADIUS, CAPTURE_RADIUS, 0.04, 48),
         new THREE.MeshBasicMaterial({ color: 0x7953cd, transparent: true, opacity: 0.13, depthWrite: false }));
-      disk.position.set(x, 0.065, z);
-      this.scene.add(disk);
+      disk.position.set(0, 0.065, 0);
+      zone.add(disk);
       const perimeter = new THREE.Mesh(new THREE.TorusGeometry(CAPTURE_RADIUS, 0.13, 6, 64), violet);
       perimeter.rotation.x = Math.PI / 2;
-      perimeter.position.set(x, 0.1, z);
-      this.scene.add(perimeter);
-      this.animatedRings.push({ ring: perimeter, speed: 0 });
+      perimeter.position.set(0, 0.1, 0);
+      zone.add(perimeter);
+      this.captureZones.set(id, zone);
     }
   }
 
@@ -500,7 +508,12 @@ export class RelayNineArena {
       { id: 'I-06', x: -27, y: 2.8, z: -22, phase: 2.8, hostile: true, route: [[-27, -22], [-31, -13], [-26, 0], [-22, 0]] },
       { id: 'I-07', x: 24, y: 2.8, z: 25, phase: 4.2, hostile: true, dropId: 'FRAG-C', route: [[24, 25], [29, 23], [29, 10], [23, 10]] },
       { id: 'I-08', x: 7, y: 2.8, z: -44, phase: 3.1, hostile: true, route: [[7, -44], [10, -49], [2, -49], [2, -44]] },
-      { id: 'M-01', x: 8, y: 1.8, z: 36, phase: 1.9, hostile: false, route: [[8, 36]] },
+      { id: 'I-09', x: -5, y: 3.1, z: 35, phase: 5.4, hostile: true, route: [[-5, 35], [5, 35], [4, 27], [-5, 27]] },
+      { id: 'I-10', x: 5, y: 3, z: -28, phase: 6.1, hostile: true, route: [[5, -28], [-5, -25], [-5, -19], [5, -19]] },
+      { id: 'I-11', x: -25, y: 3.1, z: -6, phase: 6.8, hostile: true, route: [[-25, -6], [-31, -6], [-32, -18], [-24, -18]] },
+      { id: 'I-12', x: 25, y: 2.9, z: 32, phase: 7.5, hostile: true, route: [[25, 32], [31, 30], [30, 20], [23, 20]] },
+      { id: 'I-13', x: -6, y: 3.2, z: -47, phase: 8.2, hostile: true, route: [[-6, -47], [-8, -50], [-2, -50], [-2, -45]] },
+      { id: 'I-14', x: 25, y: 2.8, z: -35, phase: 8.9, hostile: true, route: [[25, -35], [29, -29], [29, -18], [23, -18]] },
     ];
     const foundry: Spec[] = [
       { id: 'I-11', x: -27, y: 3, z: 30, phase: 0.3, hostile: true, respawnDelay: 7, route: [[-27, 30], [-30, 12], [-21, 15]] },
@@ -674,6 +687,21 @@ export class RelayNineArena {
     ring.rotation.x = Math.PI / 2;
     ring.position.y = 0.11;
     group.add(ring);
+    // Tall lime locator makes the upload station readable from the approach corridor.
+    const beacon = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.22, 6.1, 10),
+      new THREE.MeshBasicMaterial({ color: 0xe6ff7b, transparent: true, opacity: 0.26, depthWrite: false }));
+    beacon.position.y = 4.1;
+    group.add(beacon);
+    const locator = new THREE.Mesh(new THREE.OctahedronGeometry(0.9), green);
+    locator.position.y = 7.1;
+    group.add(locator);
+    for (const side of [-1, 1]) {
+      this.box(side * 1.4, 2.35, 0.28, 0.12, 4.7, 0.1, green, group);
+      this.box(side * 1.4, 4.7, 0.28, 0.6, 0.12, 0.1, green, group);
+    }
+    const ambient = new THREE.PointLight(0xe6ff7b, 23, 18, 2);
+    ambient.position.y = 3.5;
+    group.add(ambient);
     group.visible = false;
     return group;
   }
@@ -781,6 +809,10 @@ export class RelayNineArena {
     return this.drones.filter((drone) => drone.hostile && drone.active).length;
   }
 
+  get activeCaptureZones(): number {
+    return [...this.captureZones.values()].filter((zone) => zone.visible).length;
+  }
+
   get sentinelHealth(): number {
     return this.drones.find((drone) => drone.id === 'SENTINEL')?.health ?? 0;
   }
@@ -829,6 +861,8 @@ export class RelayNineArena {
       marker.active = true;
       marker.capture = { charge: 0, complete: false };
       marker.group.visible = true;
+      const zone = this.captureZones.get(marker.id);
+      if (zone) zone.visible = true;
     }
   }
 
@@ -852,17 +886,28 @@ export class RelayNineArena {
   }
 
   /** Proximity pickups are mission-one only; towers charge automatically. */
-  scanNearby(x: number, z: number): string | null {
+  getInteraction(x: number, z: number): { kind: 'fragment' | 'upload'; id: string } | null {
     if (this.mission !== 0) return null;
     const fragment = this.fragments.find((piece) => !piece.collected && Math.hypot(piece.position.x - x, piece.position.z - z) <= 3.4);
-    if (fragment) {
+    if (fragment) return { kind: 'fragment', id: fragment.id };
+    if (!this.shutdownComplete && this.shutdownConsole.visible && Math.hypot(this.shutdownConsole.position.x - x, this.shutdownConsole.position.z - z) <= 3.5)
+      return { kind: 'upload', id: 'UPLOAD' };
+    return null;
+  }
+
+  scanNearby(x: number, z: number): string | null {
+    const interaction = this.getInteraction(x, z);
+    if (!interaction) return null;
+    if (interaction.kind === 'fragment') {
+      const fragment = this.fragments.find((piece) => piece.id === interaction.id);
+      if (!fragment) return null;
       fragment.collected = true;
       fragment.group.visible = false;
       this.spawnImpact(fragment.position.clone().add(new THREE.Vector3(0, 1, 0)), 0xe6ff7b, 0.9);
       if (this.fragments.length === 3 && this.fragments.every((piece) => piece.collected)) this.shutdownConsole.visible = true;
       return fragment.id;
     }
-    if (!this.shutdownComplete && this.shutdownConsole.visible && Math.hypot(this.shutdownConsole.position.x - x, this.shutdownConsole.position.z - z) <= 3.5) {
+    if (interaction.kind === 'upload') {
       this.shutdownComplete = true;
       this.shutdownConsole.visible = false;
       this.spawnImpact(this.shutdownConsole.position.clone().add(new THREE.Vector3(0, 2, 0)), 0xe6ff7b, 1.2);
@@ -881,6 +926,8 @@ export class RelayNineArena {
     if (!wasComplete && nearest.marker.capture.complete) {
       nearest.marker.active = false;
       nearest.marker.group.visible = false;
+      const zone = this.captureZones.get(nearest.marker.id);
+      if (zone) zone.visible = false;
       this.spawnImpact(nearest.marker.position.clone().add(new THREE.Vector3(0, 3, 0)), 0xad8fff, 2);
     }
     return { id: nearest.marker.id, percent: Math.round(nearest.marker.capture.charge * 100),

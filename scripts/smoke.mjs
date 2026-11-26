@@ -35,6 +35,8 @@ try {
   await page.getByRole('button', { name: /field manual/i }).click();
   await page.getByRole('heading', { name: /field manual/i }).waitFor();
   await page.getByRole('button', { name: /enter mission/i }).click();
+  await page.locator('#missionBriefing').waitFor({ state: 'visible' });
+  await page.getByRole('button', { name: /engage mission/i }).click();
   await page.locator('#hudTop').waitFor({ state: 'visible' });
   await page.waitForTimeout(1200);
   await page.screenshot({ path: 'artifacts/gameplay.png' });
@@ -45,6 +47,7 @@ try {
   assert.equal(await page.locator('#objectiveCount').textContent(), '0 / 4');
   assert.equal(await page.locator('#healthValue').textContent(), '100 / 100');
   assert.equal(await page.locator('#minimapPanel').isVisible(), true);
+  assert.equal(await page.locator('#interactionPrompt').isVisible(), false);
   assert.equal(await page.locator('#menuOverlay').isVisible(), false);
   assert.equal(await page.locator('#bossPanel').isVisible(), false, 'Boss HUD is only shown in mission 3');
   assert.equal(await page.locator('#capturePanel').isVisible(), false, 'Capture HUD is only shown in mission 2');

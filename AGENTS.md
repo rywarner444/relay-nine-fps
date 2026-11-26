@@ -36,10 +36,11 @@ This is a browser-first, single-player 3D FPS prototype for an AI-assisted cyber
 - `src/simulation.ts`: deterministic player movement and scoring.
 - `src/campaign.ts`: deterministic mission progression and validation.
 - `src/objectives.ts`: pure, deterministic tower hold-zone capture rules.
+- `src/navigation.ts`: deterministic collision-aware dotted minimap route to the base-floor upload computer.
 - `src/audio.ts`: local synthesized game audio (opt-in).
 - `src/styles.css`: menu, HUD, accessible interface and responsive layout.
 - `tests/*.test.ts`: deterministic movement and scoring tests.
 
-## Current milestone — Three Distinct Fronts (v0.5)
+## Current milestone — Combat and Clarity (v0.6)
 
-Three finishable, fully separate environments: (01) base-floor corridor battle with eight roaming rogues, three collectible network fragments dropped by carrier enemies, and a computer upload; (02) industrial foundry with eight respawning enemies and three purple uplinks requiring nine-second capture holds; (03) open circular arena with a mobile 110-hit mech, four escort drones and timed incoming reinforcements. The boss itself is the sole final objective. A prominent boss armor bar, capture HUD, endgame achievement, local unlocked-level checkpoints and same-level death retry complete the loop. Rendering, assets, and game AI are generated locally without any real security telemetry, live LLM, APIs, or backend.
+Three finishable, fully separate environments: (01) base-floor corridor battle with fourteen roaming rogues and a faster firing cadence, three collectible network fragments dropped by lime-marked carriers, and a computer upload guided by an on-demand collision-aware dotted minimap route; (02) industrial foundry with eight respawning enemies and three purple uplinks requiring nine-second capture holds, whose floor rings disappear when secured; (03) open circular arena with a mobile 110-hit mech, four escort drones and timed incoming reinforcements. The boss itself is the sole final objective. Prominent nearby E prompts, concise pre-deployment objective briefings, a cleaner opaque HUD with health-bar-only damage feedback, boss armor bar, endgame achievement, local unlocked-level checkpoints and same-level death retry complete the loop. No friendly maintenance decoy or unnecessary integrity meter. All assets, enemy behavior and objectives are synthetic, deterministic and local; no real telemetry, live LLM, APIs, or backend.

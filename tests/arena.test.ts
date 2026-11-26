@@ -5,7 +5,7 @@ import { RelayNineArena } from '../src/arena.ts';
 
 test('the three mission maps have distinct navigable collision layouts and threat counts', () => {
   const levels = [new RelayNineArena(0), new RelayNineArena(1), new RelayNineArena(2)];
-  assert.deepEqual(levels.map((arena) => arena.activeHostiles), [8, 8, 5]);
+  assert.deepEqual(levels.map((arena) => arena.activeHostiles), [14, 8, 5]);
   const mapSignature = (arena: RelayNineArena): string => arena.blockers
     .map((b) => `${b.x},${b.z},${b.halfWidth}`).join('|');
   assert.equal(new Set(levels.map(mapSignature)).size, 3);
@@ -35,26 +35,51 @@ test('carrier combat creates a world drop that needs proximity and E interaction
   const last = arena.fire();
   assert.equal(last.targetId, 'I-01');
   assert.equal(last.destroyed, true);
-  assert.equal(arena.activeHostiles, 7);
+  assert.equal(arena.activeHostiles, 13);
+  assert.deepEqual(arena.getInteraction(-5, 25), { kind: 'fragment', id: 'FRAG-A' });
   assert.equal(arena.scanNearby(0, 42), null, 'Pickup cannot be collected remotely');
   assert.equal(arena.scanNearby(-5, 25), 'FRAG-A');
   assert.equal(arena.scanNearby(-5, 25), null, 'Pickup cannot be collected twice');
   assert.equal(arena.getWaypoint(-5, 25)?.id, 'CARRIER FRAG-C');
   arena.update(8, 8, 0, false);
-  assert.equal(arena.activeHostiles, 7, 'Initial mission enemies do not respawn');
+  assert.equal(arena.activeHostiles, 13, 'Initial mission enemies do not respawn');
   arena.dispose();
 });
 
-test('friendly maintenance target is protected by false-positive rules', () => {
+test('mission 1 is fully hostile-only, with no unnecessary maintenance decoy', () => {
   const arena = new RelayNineArena(0);
-  arena.camera.lookAt(new THREE.Vector3(8, 1.8, 36));
-  arena.camera.updateMatrixWorld(true);
-  assert.equal(arena.fire().kind, 'neutral');
+  assert.equal(arena.tacticalBlips.filter((blip) => blip.type === 'friendly').length, 0);
+  assert.equal(arena.activeHostiles, 14);
+  arena.dispose();
+});
+
+test('computer upload becomes interactable only after all three carrier fragments are recovered', () => {
+  const arena = new RelayNineArena(0);
+  assert.equal(arena.getInteraction(0, -47), null);
+  const carriers = [
+    { id: 'FRAG-A', camera: [0, 1.72, 42], target: [-5, 2.8, 25], pickup: [-5, 25] },
+    { id: 'FRAG-B', camera: [26, 1.72, -10], target: [26, 3, -18], pickup: [26, -18] },
+    { id: 'FRAG-C', camera: [24, 1.72, 35], target: [24, 2.8, 25], pickup: [24, 25] },
+  ];
+  for (const carrier of carriers) {
+    arena.camera.position.set(...carrier.camera as [number, number, number]);
+    arena.camera.lookAt(new THREE.Vector3(...carrier.target as [number, number, number]));
+    arena.camera.updateMatrixWorld(true);
+    const first = arena.fire();
+    assert.equal(first.kind, 'hostile', `Carrier ${carrier.id} must be hittable`);
+    const second = arena.fire();
+    assert.equal(second.destroyed, true);
+    assert.equal(arena.scanNearby(...carrier.pickup as [number, number]), carrier.id);
+  }
+  assert.deepEqual(arena.getInteraction(0, -47), { kind: 'upload', id: 'UPLOAD' });
+  assert.equal(arena.scanNearby(0, -47), 'UPLOAD');
+  assert.equal(arena.getInteraction(0, -47), null, 'Upload cannot be claimed twice');
   arena.dispose();
 });
 
 test('tower capture needs nine seconds in each of three distinct world-space radii', () => {
   const arena = new RelayNineArena(1);
+  assert.equal(arena.activeCaptureZones, 3);
   assert.equal(arena.scanNearby(-29, 18), null, 'Cannot press E to bypass tower charging');
   const outside = arena.updateCapture(0, 42, 0.05);
   assert.equal(outside?.inRange, false);
@@ -70,6 +95,7 @@ test('tower capture needs nine seconds in each of three distinct world-space rad
     assert.equal(capture?.inRange, true);
     for (let i = 0; i < 182 && !capture?.completed; i += 1) capture = arena.updateCapture(site.x, site.z, 0.05);
     assert.equal(capture?.completed, true);
+    assert.equal(arena.activeCaptureZones, 3 - (sites.indexOf(site) + 1), 'Captured ring and tower must both disappear');
   }
   assert.equal(arena.getWaypoint(0, 42), null);
   arena.dispose();

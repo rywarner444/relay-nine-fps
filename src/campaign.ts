@@ -6,23 +6,39 @@ export interface MissionDefinition {
   codename: string;
   briefing: string;
   lesson: string;
+  instructions: readonly string[];
 }
 
 export const MISSIONS: readonly MissionDefinition[] = [
   {
     number: '01', name: 'BASE FLOOR', codename: 'RETRIEVE / RESTORE',
-    briefing: 'Clear hostile patrols. Three marked rogues carry network fragments: eliminate them, collect their drops with E, then insert all three into the base-floor computer.',
+    briefing: 'Defeat the lime-marked carrier drones, collect all three green network fragments, then follow the dotted route on your radar to the upload computer.',
     lesson: 'Threat response: collect verified artifacts before restoring a service.',
+    instructions: [
+      'Fight through the base floor. The three drones with lime halos carry network fragments.',
+      'When a carrier falls, approach its green drop and press E when the pickup prompt appears.',
+      'After collecting all three, follow the dotted lime route on your minimap to the computer. Press E to insert them.',
+    ],
   },
   {
     number: '02', name: 'SIGNAL FOUNDRY', codename: 'HOLD / CAPTURE',
     briefing: 'Secure three uplink towers across the foundry. Stand inside each violet capture ring until it reaches 100%. Fight off incoming drone patrols while you hold the zone.',
     lesson: 'Resilience engineering: maintain control of infrastructure under pressure.',
+    instructions: [
+      'Navigate the foundry and locate an active purple uplink tower.',
+      'Step into its floor ring. Stay inside for nine seconds while defending yourself.',
+      'The tower and ring vanish at 100%. Repeat at the remaining two towers.',
+    ],
   },
   {
     number: '03', name: 'SENTINEL ARENA', codename: 'SURVIVE / DEFEAT',
     briefing: 'One final objective: defeat the giant mobile sentinel. It has heavy armor, powerful missiles, and summons reinforcement drones. Keep moving and use the arena cover.',
     lesson: 'Adversarial systems: manage a high-priority threat while handling reinforcements.',
+    instructions: [
+      'Your only objective is to destroy the giant Sentinel mech.',
+      'Watch its red armor bar. Move, sprint, slide, and reload behind cover.',
+      'Drones reinforce the boss. Destroying the mech unlocks your victory achievement.',
+    ],
   },
 ];
 
@@ -58,10 +74,11 @@ export function missionProgress(state: CampaignState): { current: number; total:
   if (state.mission === 0) {
     const collected = ['FRAG-A', 'FRAG-B', 'FRAG-C'].every((id) => state.completed.includes(id));
     return {
-      current, total, complete: current === total, label: 'NETWORK RECOVERY',
-      title: collected ? 'Insert the fragments' : 'Recover three network fragments',
-      hint: collected ? 'Follow the green computer marker and press E to insert the fragments.'
-        : 'Eliminate marked magenta carrier drones. Collect the luminous green drops with E.',
+      current, total, complete: current === total,
+      label: collected ? '3 FRAGMENTS SECURED · UPLOAD PENDING' : 'FRAGMENT RECOVERY · 3 REQUIRED',
+      title: collected ? 'Reach the upload computer' : 'Recover three network fragments',
+      hint: collected ? 'All 3 fragments secured. Follow the dotted LIME route on your minimap to the computer, then press E when prompted.'
+        : 'Find the three drones with LIME halos. Shoot them, approach their green drops, and press E when the PICK UP prompt appears.',
     };
   }
   if (state.mission === 1) return {

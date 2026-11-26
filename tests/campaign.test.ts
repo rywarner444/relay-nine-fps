@@ -21,7 +21,8 @@ test('base floor requires three distinct pickups before computer insertion', () 
   state = recordMissionEvent(state, { type: 'fragment', id: 'BOGUS' });
   assert.equal(missionProgress(state).current, 1);
   for (const id of ['FRAG-B', 'FRAG-C']) state = recordMissionEvent(state, { type: 'fragment', id });
-  assert.match(missionProgress(state).title, /insert/i);
+  assert.match(missionProgress(state).title, /upload computer/i);
+  assert.match(missionProgress(state).hint, /dotted lime route/i);
   assert.equal(missionProgress(state).complete, false);
   state = recordMissionEvent(state, { type: 'upload', id: 'UPLOAD' });
   assert.equal(missionProgress(state).complete, true);

@@ -13,9 +13,9 @@ export interface EnemyTuning {
 }
 
 export const ENEMY_TIERS: readonly EnemyTuning[] = [
-  { health: 2, speed: 2.15, fireInterval: 2.1, projectileSpeed: 13, damage: 6, range: 29 },
-  { health: 3, speed: 2.7, fireInterval: 1.8, projectileSpeed: 15, damage: 7, range: 36 },
-  { health: 3, speed: 3.15, fireInterval: 1.65, projectileSpeed: 17, damage: 7, range: 40 },
+  { health: 2, speed: 2.45, fireInterval: 1.65, projectileSpeed: 15, damage: 6, range: 32 },
+  { health: 3, speed: 2.7, fireInterval: 1.5, projectileSpeed: 16, damage: 7, range: 36 },
+  { health: 3, speed: 3.15, fireInterval: 1.35, projectileSpeed: 18, damage: 7, range: 40 },
 ];
 
 export const BOSS_TUNING: EnemyTuning = {
