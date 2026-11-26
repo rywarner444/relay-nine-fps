@@ -1,31 +1,37 @@
 # RELAY NINE — The Signal Campaign
 
-**A three-level cyberpunk browser FPS designed to showcase AI-assisted game engineering, procedural 3D environments, deterministic enemy AI, and cybersecurity-inspired mechanics.**
+### [▶ PLAY RELAY NINE — LAUNCH THE GAME IN YOUR BROWSER](https://rywarner444.github.io/relay-nine-fps/)
 
-> **Portfolio release candidate 0.7 — Combat Readability.** Separate 3D levels, **18** faster-firing opponents on Mission 01, distinctly bright-green carrier halos and artifact pickups, a visible radial reload gauge with a weapon-lowering animation, an opaque depth-tested ARC-7 carbine, and an integrated Engineering View button. Earlier additions remain: proximity pickup prompts, a walkable dotted minimap route to the upload computer, three defended uplink captures, concise pre-level briefings, a mobile 110-HP final boss, checkpoint retries, and a campaign achievement. The fictional adversaries use scripted game logic; trained/adaptive AI, real security evidence analysis, and online LLM integration are **not implemented**.
+**No installation · No account · No API keys · Free to play · Desktop browser + mouse and keyboard**
 
-The internal creative codename is *Ghost Signal*. The user-facing title is Relay Nine.
+[![Tests and build](https://github.com/rywarner444/relay-nine-fps/actions/workflows/ci.yml/badge.svg)](https://github.com/rywarner444/relay-nine-fps/actions/workflows/ci.yml)
+[![Live GitHub Pages deployment](https://github.com/rywarner444/relay-nine-fps/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/rywarner444/relay-nine-fps/actions/workflows/deploy-pages.yml)
 
-## Play directly in your browser
+**RELAY NINE** is a three-mission, first-person cyberpunk action game built with **TypeScript, Three.js, Vite, and AI-assisted engineering**. Explore three levels across distinct 3D facilities, fight mobile drones, recover fictional network fragments, hold contested uplinks, and defeat a heavily armored final boss.
 
-**Launch URL after GitHub Pages is enabled:** https://rywarner444.github.io/relay-nine-fps/
+The project combines responsive FPS mechanics, local state machines, cybersecurity-inspired objectives, handcrafted UI, performance-aware 3D rendering, and automated tests/deployment. The internal creative codename is *Ghost Signal*; the game's public title is **RELAY NINE**.
 
-No installation, account, or API credits are needed to play the published static game. Desktop Chrome, Firefox, or Edge with a keyboard and mouse is recommended. The opening screen includes a Field Manual tutorial and a three-step mission briefing.
+## 🎮 Play the live demo
 
-To turn on publishing after the repository owner makes it public: visit **Settings → Pages → Build and deployment → Source: GitHub Actions**. In the **Actions** tab, run the **Deploy RELAY NINE to GitHub Pages** workflow manually if the automatic deployment hasn't started. Once the deployment job succeeds, the URL above becomes playable. Every later push to `main` automatically rebuilds, tests, and deploys the latest version.
+### **[► CLICK HERE TO PLAY NOW](https://rywarner444.github.io/relay-nine-fps/)**
 
-## Play locally
+1. Open the link above in a modern desktop browser with WebGL and hardware acceleration enabled.
+2. Click **START OPERATION** and review the three-step mission briefing. **FIELD MANUAL** provides a concise tutorial and control reference.
+3. Click **ENGAGE MISSION**, aim with your mouse, move with **WASD**, and left-click to fire. Press **Esc** to pause and adjust graphics or mouse sensitivity.
 
-Requires Node.js **22.12+**, a desktop mouse and keyboard, and a modern WebGL-capable browser. No keys, accounts, servers, databases, or AI credits are required.
+The demo is designed for a quick portfolio playthrough, but includes enough depth to reward exploration. Progress is saved locally by unlocked mission, so dying in Mission 2 or 3 never forces you to replay the entire campaign.
 
-```bash
-npm ci
-npm run dev
-```
+**Already played?** [Replay the game](https://rywarner444.github.io/relay-nine-fps/) · [Review the code](https://github.com/rywarner444/relay-nine-fps/tree/main/src) · [See automated checks](https://github.com/rywarner444/relay-nine-fps/actions)
 
-Open the Vite URL, usually **http://localhost:5173/**. In GitHub Codespaces, go to the forwarded **5173** port. Click **Start Operation**, read the compact three-step mission briefing, and then click **Engage Mission** to enter combat. **Field Manual** opens a full tutorial. **Esc** pauses and releases the mouse.
+## What you'll experience
 
-## The three levels
+- **Fast, tactical combat:** 3D drone patrols with line-of-sight checks, incoming projectiles, cover, sprinting, jumping, sliding, hitmarkers, health and ammo.
+- **Polished first-person presentation:** a solid ARC-7 pulse carbine, recoil, an animated reload movement and radial progress meter, cyberpunk lighting, and original violet/lime HUD.
+- **Cybersecurity-themed objectives:** collect synthetic network artifacts, insert them at a computer, defend signal uplinks, and stop a fictional rogue-AI sentinel.
+- **Useful HUD systems:** live minimap with nearby enemies and objectives, contextual **E** pickup prompts, computer-only dotted navigation route, adjustable mouse sensitivity, and optional local renderer diagnostics.
+- **Three distinct levels, a final boss, checkpoints and a victory achievement.**
+
+## Three missions. Three unique maps.
 
 | Mission | Distinct map | Player objective | Cybersecurity / engineering theme |
 |---|---|---|---|
@@ -33,7 +39,7 @@ Open the Vite URL, usually **http://localhost:5173/**. In GitHub Codespaces, go 
 | **02 / Signal Foundry** | Industrial refinery floor with pipe tanks, new partitions and wide flanking lanes | Reach three separate purple **uplink towers**. Remain in each tower's glowing **7.5m radius for 9 seconds** to charge it to 100%. Keep fighting while capturing. The captured tower **and floor ring both disappear**; the capture HUD appears only inside an active ring. **No E key** needed. | Infrastructure resilience, availability under pressure |
 | **03 / Sentinel Arena** | Open circular combat arena with cover and crimson warning lights | **Defeat Aegis-9**, a mobile 110-HP mech. An obvious top-screen health bar tracks armor. Four escort drones defend it, additional drones spawn on timers, and defeated escorts respawn. Killing the Sentinel is the **only** objective. | Threat prioritization, adversarial systems, resource management |
 
-Completing the final fight unlocks an in-game **GHOST PROTOCOL** achievement and victory/debrief screen with score, accuracy, elapsed time, and enemies destroyed. Missions are deliberately compact enough for portfolio reviewers to try in a short browser session.
+Completing the final fight unlocks the **GHOST PROTOCOL** achievement and a victory/debrief screen showing score, accuracy, elapsed time, and enemies destroyed. Each mission opens with a concise objective briefing so first-time players know what to do.
 
 ### Combat and navigation
 
@@ -45,6 +51,15 @@ Completing the final fight unlocks an in-game **GHOST PROTOCOL** achievement and
 - The earlier amber maintenance drone was removed because it was distracting and had no meaningful role. The unused network-integrity meter was replaced with a live hostile-contact count.
 - When the third fragment is collected, the radar calculates a **walkable route around real walls and cover**, drawing it as a luminous dashed line from the player toward the upload computer. That route is deliberately **absent** during other objectives and missions.
 - The old red full-screen damage overlay was removed. Damage feedback now pulses the health bar; Engineering View now sits **inside** the opaque Operator Vitals panel instead of floating over an unrelated dark rectangular backdrop.
+
+### Latest release — v0.7 / Combat Readability
+
+- Increased **Mission 01 to 18 hostile drones** with additional patrol coverage while batching drone meshes to control draw calls.
+- Matched carrier markers, dropped fragments, and the upload computer to **bright green** so instructions and gameplay agree.
+- Added a prominent **circular reload percentage meter** and a timed gun-lowering/tilt animation.
+- Improved the ARC-7's **opaque, depth-tested geometry** and connected its receiver for a more solid weapon silhouette.
+- Integrated **Engineering View** into the Operator Vitals panel and removed the confusing floating dark backdrop.
+- Published the browser game via **GitHub Pages** with a verified two-job GitHub Actions build/deploy pipeline and an artifact-lookup retry.
 
 ### Controls
 
@@ -62,6 +77,17 @@ Completing the final fight unlocks an in-game **GHOST PROTOCOL** achievement and
 | Esc | Pause, access settings, release mouse |
 
 Mouse sensitivity adjusts from **50% to 250%** in settings and is saved locally. Audio is **off by default** and is synthesized in the browser if enabled. Reduced-motion preferences are respected. The tutorial can be opened from the menu at any time.
+
+## Run it locally (developers)
+
+Requires Node.js **22.12+**, a desktop mouse and keyboard, and a WebGL-capable browser.
+
+```bash
+npm ci
+npm run dev
+```
+
+Open the URL printed by Vite, normally **http://localhost:5173/**. In a GitHub Codespace, open forwarded port **5173**. No database, server-side application, account, API keys, or paid AI credits are required.
 
 ## Engineering highlights
 
@@ -86,7 +112,7 @@ The Three.js game uses procedural models and an original code-generated metal te
 npm run check
 ```
 
-`check` runs automated Node/TypeScript tests, TypeScript static validation, and the optimized Vite production build. GitHub Actions runs the same checks for pushes and pull requests. The Pages deployment workflow also runs `check` before publishing the built `dist/` files.
+`check` runs **43 automated tests**, TypeScript static validation, and the optimized Vite production build. GitHub Actions runs the same checks for pushes and pull requests. The Pages deployment workflow runs `check` again, uploads the `dist/` site artifact in a dedicated build job, and publishes it from a separate job. It can retry the publish step if GitHub temporarily fails to find the uploaded artifact. Every push to `main` automatically triggers a new deployment.
 
 For an optional browser-based UI smoke test with a locally installed Chrome/Chromium binary:
 
@@ -104,10 +130,17 @@ The smoke tool may require a `CHROMIUM_PATH` environment variable; the CI unit/b
 4. **v0.5 / Three Distinct Fronts:** independently instantiated 3D maps, carrier fragment drops, charged uplink defense, multi-wave mobile boss encounter with highly visible HP, same-stage defeat retries, local stage unlocks, final achievement.
 5. **v0.6 / Combat and Clarity:** denser and faster Mission 01 combat; clear fragment/console interactions; collision-aware dotted minimap guidance; complete uplink-floor cleanup; mission-intel briefing screens; retired maintenance decoy and integrity meter; streamlined health-only damage feedback.
 6. **v0.7 / Combat Readability (current):** increased Base Floor to 18 hostiles; matched three artifact/carrier markers and the upload computer to clearly green 3D highlights; added radial reload meter and carbine motion; corrected firearm depth testing and connected its chassis; integrated engineering toggle into vitals to eliminate the floating background artifact.
-7. **Future:** device-specific performance tuning, audio/FX improvements, additional original 3D/PBR models, gamepad and accessibility polish, gameplay trailer, owner-approved privacy audit and optional public GitHub Pages launch.
+7. **Public portfolio deployment:** live GitHub Pages site, automated build/deploy workflow, dedicated publish stage and resilient artifact lookup.
+8. **Possible next upgrades:** device-specific performance tuning, additional original 3D/PBR models, gamepad/accessibility polish, optional gameplay trailer and richer portfolio screenshots.
 
 ## Privacy and AI disclosure
 
 The entire game operates on **synthetic, fictional gameplay data**. There are **no real security telemetry feeds, employer systems, personal-information inputs, accounts, analytics services, tracking scripts, model API keys, or live LLM calls**. Only the unlocked mission number, optional sensitivity, and best score are saved to local browser storage.
 
-The rogue AI antagonist is fictional; enemies are deterministic authored state machines, not trained agents. This repo demonstrates AI-assisted software development and human-directed engineering iteration, **not** a live AI integration or production cybersecurity tool. Repository visibility and Pages availability are controlled by its owner in GitHub Settings.
+The rogue AI antagonist is fictional; enemies are deterministic authored state machines, not trained agents. Trained/adaptive AI, real security evidence analysis, and online LLM integrations are **not implemented**. This repository demonstrates **AI-assisted software development plus human-directed engineering, iteration, testing, and deployment**—not a production cybersecurity tool. All gameplay runs on synthetic local data. Repository visibility and Pages publication are controlled by its owner in GitHub Settings.
+
+---
+
+### [🎮 PLAY RELAY NINE NOW →](https://rywarner444.github.io/relay-nine-fps/)
+
+*A playable 3D cyberpunk portfolio project. No download required.*
