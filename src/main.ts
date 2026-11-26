@@ -5,8 +5,9 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RelayNineArena, type GraphicsTier } from './arena';
 import { RangeAudio } from './audio';
+import { MISSIONS, missionProgress, recordMissionEvent, startMission, type CampaignState } from './campaign';
 import {
-  advancePlayer, initialPlayer, initialStats, recordShot, shotAccuracy, RANGE_GOAL,
+  advancePlayer, initialPlayer, initialStats, recordShot, shotAccuracy,
   type PlayerMotion, type RangeStats,
 } from './simulation';
 import './styles.css';
@@ -54,8 +55,10 @@ composer.addPass(new OutputPass());
 const keys = new Set<string>();
 let player: PlayerMotion = initialPlayer();
 let stats: RangeStats = initialStats();
+let campaign: CampaignState = startMission(0);
 let sessionStarted = false;
 let paused = true;
+let menuMode: 'intro' | 'pause' | 'between' | 'victory' | 'failed' = 'intro';
 let yaw = 0;
 let pitch = -0.03;
 let fireHeld = false;
@@ -77,13 +80,15 @@ let autoTierOverride: GraphicsTier | null = null;
 let notifyTimer: number | undefined;
 let hitTimer: number | undefined;
 let taskComplete = false;
+let runTime = 0;
+let waypointRefresh = 0;
 let bobEye = 1.72;
 let lastWalkAmount = 0;
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
 function setVisibleGameHud(visible: boolean): void {
   for (const id of [
-    'hudTop', 'objectivePanel', 'telemetryPanel', 'crosshair', 'weaponPanel', 'movementHint', 'engineeringButton',
+    'hudTop', 'objectivePanel', 'telemetryPanel', 'crosshair', 'weaponPanel', 'movementHint', 'engineeringButton', 'waypointPanel',
   ]) element<HTMLElement>(id).hidden = !visible;
   if (!visible) engineeringPanel.hidden = true;
 }
@@ -97,7 +102,7 @@ function announce(message: string, kind: 'neutral' | 'success' | 'danger' = 'neu
   notifyTimer = window.setTimeout(() => { toast.hidden = true; }, duration);
 }
 
-function showHitmarker(kind: 'hostile' | 'neutral'): void {
+function showHitmarker(kind: 'hostile' | 'neutral' | 'objective'): void {
   const hit = element<HTMLElement>('hitmarker');
   hit.hidden = false;
   hit.dataset.kind = kind;
@@ -110,25 +115,69 @@ function updateStats(): void {
   element('accuracyValue').textContent = stats.shots === 0 ? '—' : `${shotAccuracy(stats)}%`;
   element('coreIntegrity').textContent = `${stats.integrity}%`;
   element<HTMLElement>('integrityFill').style.width = `${stats.integrity}%`;
-  element('objectiveCount').textContent = `${Math.min(stats.eliminations, RANGE_GOAL)} / ${RANGE_GOAL}`;
-  element<HTMLElement>('objectiveFill').style.width = `${Math.min(100, stats.eliminations / RANGE_GOAL * 100)}%`;
-  if (stats.eliminations >= RANGE_GOAL && !taskComplete) {
+  const progress = missionProgress(campaign);
+  element('objectiveTitle').textContent = progress.title;
+  element('objectiveText').textContent = progress.hint;
+  element('objectiveCaption').textContent = progress.label;
+  element('objectiveCount').textContent = `${progress.current} / ${progress.total}`;
+  element<HTMLElement>('objectiveFill').style.width = `${progress.current / progress.total * 100}%`;
+  element('bossHealth').textContent = campaign.mission === 2 && campaign.completed.length >= 3
+    ? `SENTINEL ARMOR // ${Math.max(0, Math.ceil(arena.sentinelHealth / 9 * 100))}%` : '';
+  if (progress.complete && !taskComplete) {
     taskComplete = true;
-    element('objectiveTitle').textContent = 'Training objective complete';
-    element('objectiveText').textContent = 'Range secured. Continue practicing or press Esc to pause.';
-    announce('DIRECTIVE COMPLETE // RANGE SECURED', 'success', 5000);
+    announce('MISSION COMPLETE // SECURITY OBJECTIVES MET', 'success', 3500);
     audio.destroy();
-    try {
-      const prior = Number(localStorage.getItem('relay-nine-best-score') ?? 0);
-      if (stats.score > prior) localStorage.setItem('relay-nine-best-score', String(stats.score));
-    } catch { /* Local storage is optional. */ }
-  }
-  if (stats.integrity <= 0) {
-    element('objectiveTitle').textContent = 'Simulation integrity lost';
-    element('objectiveText').textContent = 'You destroyed too many friendly processes. Restart the range to try again.';
-    announce('NETWORK INTEGRITY CRITICAL // RESET RECOMMENDED', 'danger', 5500);
     pauseGame();
+    menuMode = campaign.mission === MISSIONS.length - 1 ? 'victory' : 'between';
+    showMenu(menuMode);
   }
+  if (stats.integrity <= 0 && menuMode !== 'failed' && !progress.complete) {
+    pauseGame();
+    menuMode = 'failed';
+    showMenu('failed');
+    announce('NETWORK INTEGRITY LOST // OPERATION FAILED', 'danger', 3500);
+  }
+}
+
+function showMenu(mode: typeof menuMode): void {
+  const next = mode === 'between' ? MISSIONS[campaign.mission + 1] : MISSIONS[campaign.mission];
+  const current = MISSIONS[campaign.mission];
+  const completed = mode === 'victory';
+  const failed = mode === 'failed';
+  const between = mode === 'between';
+  const pausedHere = mode === 'pause';
+  element('menuHeadline').innerHTML = completed ? 'FACILITY<br><em>SECURED.</em>'
+    : failed ? 'SIGNAL<br><em>LOST.</em>'
+      : between ? 'MISSION<br><em>CLEARED.</em>'
+        : pausedHere ? 'OPERATION<br><em>PAUSED.</em>' : 'ENTER THE<br><em>UNKNOWN.</em>';
+  element('menuDescription').textContent = completed
+    ? 'You classified threats, followed the evidence, and contained a fictional rogue AI. Three operations. One recovered facility.'
+    : failed ? 'Friendly network integrity reached zero. Reset and try again—accuracy matters more than speed.'
+      : between ? `${current.name} complete. ${next.briefing}`
+        : pausedHere ? `Mission ${current.number}: ${current.briefing}`
+          : 'Three short cyberpunk FPS missions. Identify a threat, follow the evidence, and shut down a rogue AI. No accounts or real security systems.';
+  element('missionNumber').textContent = next.number;
+  element('missionName').textContent = next.name;
+  element('missionDescription').textContent = next.lesson;
+  element('menuMissionNumber').textContent = `[ MISSION ${next.number} / 03 ]`;
+  element('missionTag').textContent = next.codename;
+  element('menuStatus').textContent = completed ? 'CAMPAIGN COMPLETE' : failed ? 'SIMULATION FAILED' : between ? 'NEXT ASSIGNMENT' : pausedHere ? 'PAUSED' : '3-MISSION MICRO CAMPAIGN';
+  deployButton.innerHTML = completed || failed ? '<span>↻</span> REPLAY CAMPAIGN'
+    : between ? '<span>▶</span> NEXT MISSION' : pausedHere ? '<span>▶</span> RESUME OPERATION' : '<span>▶</span> START OPERATION';
+  const debrief = element<HTMLElement>('debrief');
+  debrief.hidden = !(completed || failed);
+  if (!debrief.hidden) {
+    element('debriefStats').textContent = `SCORE ${stats.score.toLocaleString()} · ACCURACY ${stats.shots ? `${shotAccuracy(stats)}%` : '—'} · ${Math.floor(runTime / 60)}:${String(Math.floor(runTime % 60)).padStart(2, '0')} · ${stats.falsePositives} FALSE POSITIVES`;
+    element('debriefRank').textContent = failed ? 'RETRY' : stats.falsePositives === 0 && shotAccuracy(stats) >= 60 ? 'S // CLEAN RESPONSE' : 'A // MISSION COMPLETE';
+    if (completed) {
+      try {
+        const prior = Number(localStorage.getItem('relay-nine-campaign-best') ?? 0);
+        if (stats.score > prior) localStorage.setItem('relay-nine-campaign-best', String(stats.score));
+      } catch { /* Browser local storage is optional. */ }
+    }
+  }
+  restartButton.hidden = mode === 'intro' || completed || failed;
+  menuOverlay.hidden = false;
 }
 
 function updateAmmo(): void {
@@ -168,10 +217,10 @@ function resize(): void {
   arena.setGraphicsTier(tier);
 }
 
-function resetRange(): void {
+function enterMission(index: number): void {
+  campaign = startMission(index);
+  arena.setMission(index);
   player = initialPlayer();
-  stats = initialStats();
-  arena.resetDrones();
   ammo = 30;
   reloading = 0;
   taskComplete = false;
@@ -181,10 +230,19 @@ function resetRange(): void {
   slidePressed = false;
   element<HTMLElement>('slideStatus').hidden = true;
   element<HTMLElement>('speedLines').classList.remove('active');
-  element('objectiveTitle').textContent = 'Clear the hostile drone signatures';
-  element('objectiveText').textContent = 'Aim at magenta drones and fire. Avoid the amber maintenance unit.';
+  element('hudMission').textContent = `${MISSIONS[index].name} / ${String(index + 1).padStart(2, '0')} OF 03`;
+  element('objectiveStep').textContent = `0${index + 1} / 03`;
+  element('missionStrip').textContent = MISSIONS.map((_, i) => i < index ? '◆' : i === index ? '◈' : '◇').join('  ');
+  document.body.dataset.mission = String(index + 1);
   updateStats();
   updateAmmo();
+}
+
+function resetCampaign(): void {
+  stats = initialStats();
+  runTime = 0;
+  sessionStarted = false;
+  enterMission(0);
 }
 
 async function requestLock(): Promise<void> {
@@ -196,7 +254,10 @@ async function requestLock(): Promise<void> {
 }
 
 async function deploy(): Promise<void> {
-  if (!sessionStarted || stats.integrity <= 0) resetRange();
+  if (menuMode === 'victory' || menuMode === 'failed') resetCampaign();
+  else if (menuMode === 'between') enterMission(campaign.mission + 1);
+  else if (!sessionStarted) enterMission(0);
+  menuMode = 'pause';
   sessionStarted = true;
   paused = false;
   keys.clear();
@@ -206,7 +267,7 @@ async function deploy(): Promise<void> {
   restartButton.hidden = false;
   lastTime = performance.now();
   await requestLock();
-  announce('FIRST CONTACT // TARGET RANGE ONLINE');
+  announce(`${MISSIONS[campaign.mission].number} // ${MISSIONS[campaign.mission].name}`, 'neutral', 3400);
 }
 
 function pauseGame(): void {
@@ -217,8 +278,10 @@ function pauseGame(): void {
   slideBuffer = 0;
   element<HTMLElement>('slideStatus').hidden = true;
   element<HTMLElement>('speedLines').classList.remove('active');
-  menuOverlay.hidden = false;
-  deployButton.innerHTML = '<span>▶</span> RESUME TRAINING';
+  if (menuMode !== 'between' && menuMode !== 'victory' && menuMode !== 'failed') {
+    menuMode = 'pause';
+    showMenu('pause');
+  }
   if (document.pointerLockElement === canvas) void document.exitPointerLock();
 }
 
@@ -246,6 +309,11 @@ function shoot(now: number): void {
   ammo -= 1;
   const hit = arena.fire();
   stats = recordShot(stats, hit.kind, hit.destroyed);
+  if (hit.destroyed && hit.targetId) {
+    if (hit.kind === 'objective') campaign = recordMissionEvent(campaign, { type: 'lock', id: hit.targetId });
+    else if (hit.targetId === 'SENTINEL') campaign = recordMissionEvent(campaign, { type: 'sentinel', id: hit.targetId });
+    else if (hit.kind === 'hostile') campaign = recordMissionEvent(campaign, { type: 'elimination', id: hit.targetId });
+  }
   audio.fire();
   if (hit.kind !== 'miss') {
     showHitmarker(hit.kind);
@@ -255,6 +323,9 @@ function shoot(now: number): void {
       element<HTMLElement>('damageFlash').classList.remove('pulse');
       void element<HTMLElement>('damageFlash').offsetWidth;
       element<HTMLElement>('damageFlash').classList.add('pulse');
+    } else if (hit.kind === 'objective') {
+      audio.destroy();
+      announce(campaign.completed.length === 3 ? 'FIREWALL DOWN // SENTINEL EXPOSED' : 'AI SECURITY LOCK DISABLED', 'success', 2300);
     } else if (hit.destroyed) {
       audio.destroy();
       announce('HOSTILE SIGNATURE NEUTRALIZED', 'success', 1200);
@@ -263,6 +334,31 @@ function shoot(now: number): void {
   if (ammo === 0) reload();
   updateAmmo();
   updateStats();
+}
+
+function collectEvidence(): void {
+  if (campaign.mission !== 1 || paused) return;
+  const id = arena.scanNearby(player.x, player.z);
+  if (!id) { announce('MOVE CLOSER TO A VIOLET EVIDENCE BEACON', 'neutral', 1800); return; }
+  campaign = recordMissionEvent(campaign, { type: 'evidence', id });
+  stats = { ...stats, score: stats.score + 300 };
+  audio.destroy();
+  announce(`EVIDENCE VERIFIED // ${id} CAPTURED`, 'success', 2200);
+  updateStats();
+}
+
+function updateWaypoint(): void {
+  const panel = element<HTMLElement>('waypointPanel');
+  const nearby = arena.getWaypoint(player.x, player.z);
+  if (!nearby) { panel.textContent = 'SECTOR SECURED'; return; }
+  const { dx, dz } = nearby;
+  const ahead = -Math.sin(yaw) * dx - Math.cos(yaw) * dz;
+  const side = Math.cos(yaw) * dx - Math.sin(yaw) * dz;
+  const angle = Math.atan2(side, ahead);
+  const direction = Math.abs(angle) > 2.4 ? 'BEHIND' : angle < -0.48 ? '◀ LEFT' : angle > 0.48 ? 'RIGHT ▶' : '▲ AHEAD';
+  const action = campaign.mission === 1 && nearby.distance <= 3.1 ? ' · PRESS E TO SCAN' : '';
+  panel.textContent = `◈ ${nearby.id}  /  ${Math.round(nearby.distance)}M  /  ${direction}${action}`;
+  panel.classList.toggle('interact-ready', action.length > 0);
 }
 
 function updateMetrics(delta: number): void {
@@ -301,6 +397,9 @@ function loop(timeMs: number): void {
   visibleTime += elapsed;
   if (!paused) {
     gameTime += elapsed;
+    runTime += elapsed;
+    waypointRefresh -= elapsed;
+    if (waypointRefresh <= 0) { waypointRefresh = 0.16; updateWaypoint(); }
     const forward = Number(keys.has('KeyW') || keys.has('ArrowUp')) - Number(keys.has('KeyS') || keys.has('ArrowDown'));
     const right = Number(keys.has('KeyD') || keys.has('ArrowRight')) - Number(keys.has('KeyA') || keys.has('ArrowLeft'));
     const sprint = keys.has('ShiftLeft') || keys.has('ShiftRight');
@@ -337,7 +436,7 @@ function loop(timeMs: number): void {
 }
 
 deployButton.addEventListener('click', () => { void deploy(); });
-restartButton.addEventListener('click', () => { resetRange(); void deploy(); });
+restartButton.addEventListener('click', () => { resetCampaign(); menuMode = 'intro'; void deploy(); });
 manualDeploy.addEventListener('click', () => { manualDialog.close(); void deploy(); });
 element('tutorialButton').addEventListener('click', openManual);
 element('closeManual').addEventListener('click', () => manualDialog.close());
@@ -375,6 +474,7 @@ document.addEventListener('keydown', (event) => {
     slideBuffer = 0.2;
   }
   if (event.code === 'KeyR' && !event.repeat) reload();
+  if (event.code === 'KeyE' && !event.repeat) collectEvidence();
   keys.add(event.code);
 });
 document.addEventListener('keyup', (event) => keys.delete(event.code));
@@ -382,6 +482,7 @@ window.addEventListener('resize', resize);
 reducedMotion.addEventListener('change', resize);
 
 resize();
-resetRange();
+resetCampaign();
+showMenu('intro');
 setVisibleGameHud(false);
 renderer.setAnimationLoop(loop);

@@ -82,11 +82,15 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--lime); out
 .hitmarker i:nth-child(3) { transform: translate(-19px, 12px) rotate(-45deg); }
 .hitmarker i:nth-child(4) { transform: translate(10px, 12px) rotate(45deg); }
 .hitmarker[data-kind="neutral"] i { background: var(--coral); box-shadow: 0 0 9px var(--coral); }
+.hitmarker[data-kind="objective"] i { background: var(--violet); box-shadow: 0 0 9px var(--violet); }
 .damage-flash { pointer-events: none; position: absolute; inset: 0; z-index: 4; opacity: 0; background: radial-gradient(circle, transparent 29%, #ff476142 100%); }
 .damage-flash.pulse { animation: flash .55s ease-out; }
 
 .slide-status { pointer-events: none; top: 70%; left: 50%; transform: translateX(-50%) skew(-8deg); background: var(--lime); color: #12151d; font-size: 16px; font-weight: 1000; letter-spacing: .15em; padding: 8px 16px; box-shadow: 7px 7px 0 #9b79fc; text-align: center; white-space: nowrap; }
 .slide-status span { display: block; font-size: 8px; letter-spacing: .3em; margin-top: 2px; }
+.waypoint-panel { position: absolute; z-index: 5; top: 87px; left: 50%; transform: translateX(-50%); max-width: 94vw; padding: 9px 19px; background: #101022ce; border-top: 2px solid #aa8dff; color: #e5defb; font-size: 10px; font-weight: 900; letter-spacing: .15em; white-space: nowrap; text-align: center; pointer-events: none; }
+.waypoint-panel.interact-ready { border-top-color: var(--lime); color: var(--lime); background: #1c1c28ed; box-shadow: 0 4px 24px #a4ff7144; }
+.boss-health { margin-top: 10px; color: var(--coral); font-size: 10px; font-weight: 900; letter-spacing: .15em; }
 .toast { left: 50%; top: 25%; transform: translateX(-50%) skew(-5deg); padding: 12px 24px; max-width: 76vw; text-align: center; color: #171624; font-size: 11px; font-weight: 950; letter-spacing: .14em; background: var(--lime); box-shadow: 7px 7px 0 #8b72b6aa; }
 .toast[data-kind="danger"] { background: #ff7289; color: #1b0c18; }
 .toast[data-kind="success"] { background: #d3ff82; }
@@ -145,6 +149,14 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--lime); out
 .menu-footnote { color: #8985a7; font-size: 9px; font-weight: 850; letter-spacing: .14em; margin-top: 32px; line-height: 1.8; }
 .menu-footnote .tiny-diamond { margin-right: 7px; }
 .menu-footnote .sep { margin: 0 9px; color: #77718c; }
+.debrief { max-width: 570px; border-left: 3px solid var(--lime); margin-top: 24px; padding: 12px 17px; background: #202038b5; display: grid; gap: 10px; }
+.debrief strong { font-size: clamp(16px, 2vw, 26px); color: #f5f0ff; letter-spacing: .05em; }
+.debrief > span { color: #c8c1ed; font-size: 10px; letter-spacing: .06em; line-height: 1.65; }
+.mission-track { margin-top: 21px; font-size: 27px; letter-spacing: .4em; color: var(--lime); }
+body[data-mission="2"] .objective-panel { border-left-color: #ba92ff; }
+body[data-mission="2"] .objective-progress span { background: #ba92ff; box-shadow: 0 0 16px #ba92ff; }
+body[data-mission="3"] .objective-panel { border-left-color: #ff637f; }
+body[data-mission="3"] .objective-progress span { background: #ff637f; box-shadow: 0 0 16px #ff637f; }
 
 .mission-card { position: relative; min-height: 425px; padding: 22px 0 27px 28px; border-left: 1px solid #9d84f37d; display: flex; flex-direction: column; justify-content: flex-end; }
 .mission-card::after { content: ''; position: absolute; top: 0; left: -3px; width: 5px; height: 65px; background: var(--lime); }
@@ -202,6 +214,7 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--lime); out
   .top-status, .hud-button .keycap { display: none; }
   .brand-badge strong { font-size: 12px; }
   .objective-panel { top: 74px; left: 12px; width: 58%; padding: 12px 15px; }
+  .waypoint-panel { top: 71px; left: auto; right: 8px; transform: none; padding: 9px 10px; max-width: 39%; white-space: normal; font-size: 9px; line-height: 1.5; }
   .objective-panel h2 { font-size: 13px; margin: 8px 0; }
   .objective-panel p { display: none; }
   .telemetry-panel { left: 12px; bottom: 12px; width: 185px; padding: 12px; }

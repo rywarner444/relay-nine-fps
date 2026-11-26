@@ -4,8 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#100e20" />
-    <meta name="description" content="Relay Nine — a browser-based cyberpunk 3D FPS movement and target-range prototype." />
-    <title>RELAY NINE // First Contact</title>
+    <meta name="description" content="Relay Nine — a three-mission browser FPS about cybersecurity, investigation, and a rogue AI. All playable offline without accounts or API keys." />
+    <title>RELAY NINE // The Signal Campaign</title>
   </head>
   <body>
     <div id="app">
@@ -15,17 +15,18 @@
       <div class="speed-lines" id="speedLines" aria-hidden="true"></div>
 
       <header class="hud-top" id="hudTop" hidden>
-        <div class="brand-badge"><span class="brand-mark" aria-hidden="true">R<span>9</span></span><div><strong>RELAY NINE</strong><small>FIRST CONTACT / SIM-01</small></div></div>
+        <div class="brand-badge"><span class="brand-mark" aria-hidden="true">R<span>9</span></span><div><strong>RELAY NINE</strong><small id="hudMission">PERIMETER BREACH / 01 OF 03</small></div></div>
         <div class="top-status"><span class="live-dot"></span> RANGE ONLINE <span class="status-separator">/</span><span id="fpsChip">-- FPS</span></div>
         <button class="hud-button" id="pauseButton" type="button">PAUSE <span class="keycap">ESC</span></button>
       </header>
 
       <section class="objective-panel hud-panel" id="objectivePanel" aria-label="Current objective" hidden>
-        <div class="eyebrow">01 <span class="thin-rule"></span> CURRENT DIRECTIVE</div>
-        <h2 id="objectiveTitle">Clear the hostile drone signatures</h2>
-        <p id="objectiveText">Aim at magenta drones and fire. Avoid the amber maintenance unit.</p>
+        <div class="eyebrow"><span id="objectiveStep">01 / 03</span> <span class="thin-rule"></span> CURRENT DIRECTIVE</div>
+        <h2 id="objectiveTitle">Identify and contain</h2>
+        <p id="objectiveText">Shoot the magenta drones. Protect the friendly maintenance unit.</p>
         <div class="objective-progress"><span id="objectiveFill"></span></div>
-        <div class="objective-progress-caption"><span>DRONES NEUTRALIZED</span><strong id="objectiveCount">0 / 6</strong></div>
+        <div class="objective-progress-caption"><span id="objectiveCaption">HOSTILES CONTAINED</span><strong id="objectiveCount">0 / 4</strong></div>
+        <div class="boss-health" id="bossHealth"></div>
       </section>
 
       <section class="telemetry-panel hud-panel" id="telemetryPanel" aria-label="Simulation telemetry" hidden>
@@ -39,6 +40,7 @@
       <div class="crosshair" id="crosshair" aria-hidden="true" hidden><i></i><i></i><i></i><i></i><span></span></div>
       <div class="hitmarker" id="hitmarker" aria-hidden="true" hidden><i></i><i></i><i></i><i></i></div>
       <div class="slide-status" id="slideStatus" aria-live="off" hidden>↠ SLIDE ENGAGED <span>EVASION BOOST</span></div>
+      <div class="waypoint-panel" id="waypointPanel" aria-live="off" hidden>◈ NEAREST OBJECTIVE</div>
       <div class="damage-flash" id="damageFlash" aria-hidden="true"></div>
       <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
@@ -49,39 +51,41 @@
         <div class="ammo-track" id="ammoTrack"></div>
       </section>
 
-      <div class="movement-hint" id="movementHint" hidden><span class="keycap">WASD</span> MOVE <span class="keycap">SHIFT</span> SPRINT <span class="keycap">SPACE</span> JUMP <span class="keycap">C</span> SLIDE WHILE MOVING</div>
+      <div class="movement-hint" id="movementHint" hidden><span class="keycap">WASD</span> MOVE <span class="keycap">SHIFT</span> SPRINT <span class="keycap">C</span> SLIDE <span class="keycap">E</span> SCAN EVIDENCE <span class="keycap">ESC</span> PAUSE</div>
       <button type="button" class="engineering-toggle" id="engineeringButton" hidden>⌘ ENGINEERING VIEW <span class="keycap">TAB</span></button>
       <aside class="engineering-panel hud-panel" id="engineeringPanel" hidden aria-label="Engineering telemetry">
         <div class="eyebrow">ENGINEERING // LOCAL OBSERVABILITY</div>
         <dl><div><dt>Frame rate</dt><dd id="metricFps">—</dd></div><div><dt>Frame time</dt><dd id="metricFrame">—</dd></div><div><dt>Draw calls</dt><dd id="metricDraw">—</dd></div><div><dt>Player position</dt><dd id="metricPosition">—</dd></div><div><dt>Active hostile drones</dt><dd id="metricTargets">—</dd></div><div><dt>Graphics tier</dt><dd id="metricQuality">—</dd></div></dl>
-        <p>Renderer statistics are measured locally. Targets are scripted; adaptive AI is not yet implemented.</p>
+        <p>Renderer statistics are measured locally. Adversaries use authored game rules; there is no live LLM or real threat telemetry.</p>
       </aside>
 
       <section class="menu-overlay" id="menuOverlay" aria-label="Game menu">
         <div class="menu-backdrop"></div>
         <div class="menu-shell">
-          <div class="menu-header"><div class="menu-overline"><span class="menu-monogram">R<span>9</span></span><span>RELAY NINE <small>INTERACTIVE FIELD TEST</small></span></div><span class="classification">BUILD 0.2 / PRIVATE DEVELOPMENT</span></div>
+          <div class="menu-header"><div class="menu-overline"><span class="menu-monogram">R<span>9</span></span><span>RELAY NINE <small>THE SIGNAL CAMPAIGN</small></span></div><span class="classification">BUILD 0.3 / PRIVATE DEVELOPMENT</span></div>
           <div class="menu-main">
             <div class="menu-title-area">
-              <div class="sector-kicker"><span class="live-dot"></span> TACTICAL FPS PROTOTYPE <span class="number-stamp">[ MISSION 01 ]</span></div>
-              <h1>ENTER THE<br /><em>UNKNOWN.</em></h1>
-              <p>One facility. One failing network. Your first assignment is live: master movement, take aim, and clear the drone range without harming friendly systems.</p>
-              <div class="menu-actions"><button class="primary-button" id="deployButton" type="button"><span>▶</span> START OPERATION</button><button class="secondary-button" id="tutorialButton" type="button">FIELD MANUAL <span aria-hidden="true">↗</span></button><button class="secondary-button" id="restartButton" type="button" hidden>↻ RESTART RANGE</button></div>
-              <div class="menu-footnote"><span class="tiny-diamond">◆</span> SOLO DEPLOYMENT <span class="sep">—</span> MOUSE + KEYBOARD <span class="sep">—</span> LOCAL SIMULATION</div>
+              <div class="sector-kicker"><span class="live-dot"></span> 3-MISSION MICRO CAMPAIGN <span class="number-stamp" id="menuMissionNumber">[ MISSION 01 / 03 ]</span></div>
+              <h1 id="menuHeadline">ENTER THE<br /><em>UNKNOWN.</em></h1>
+              <p id="menuDescription">Three short cyberpunk FPS missions. Identify a threat, follow the evidence, and shut down a rogue AI.</p>
+              <div class="menu-actions"><button class="primary-button" id="deployButton" type="button"><span>▶</span> START OPERATION</button><button class="secondary-button" id="tutorialButton" type="button">FIELD MANUAL <span aria-hidden="true">↗</span></button><button class="secondary-button" id="restartButton" type="button" hidden>↻ RESTART CAMPAIGN</button></div>
+              <div class="debrief" id="debrief" hidden><div class="eyebrow">MISSION DEBRIEF // LOCAL RESULTS</div><strong id="debriefRank">A // MISSION COMPLETE</strong><span id="debriefStats">SCORE 0000</span></div>
+              <div class="menu-footnote"><span class="tiny-diamond">◆</span> SOLO DEPLOYMENT <span class="sep">—</span> MOUSE + KEYBOARD <span class="sep">—</span> OFFLINE FICTIONAL SIMULATION</div>
             </div>
             <div class="mission-card">
-              <div class="mission-card-header"><span>// YOUR ASSIGNMENT</span><span class="tier-badge">RANGE / 01</span></div>
-              <div class="mission-number" aria-hidden="true">01<span class="mission-number-slice"></span></div>
-              <div class="mission-name">FIRST CONTACT <span>↗</span></div>
-              <p>Get comfortable with the fundamentals. The scanner, adversarial AI, and campaign systems are in development.</p>
-              <div class="stat-pills"><span>01 / TRAINING</span><span>04 / HOSTILE SIGNATURES</span><span>∞ / RETRIES</span></div>
+              <div class="mission-card-header"><span id="menuStatus">3-MISSION MICRO CAMPAIGN</span><span class="tier-badge" id="missionTag">IDENTIFY / CONTAIN</span></div>
+              <div class="mission-number" aria-hidden="true"><span id="missionNumber">01</span><span class="mission-number-slice"></span></div>
+              <div class="mission-name"><span id="missionName">PERIMETER BREACH</span> <span>↗</span></div>
+              <p id="missionDescription">Threat classification: precision matters more than firing blindly.</p>
+              <div class="stat-pills"><span>01 / CONTAIN</span><span>02 / INVESTIGATE</span><span>03 / RECOVER</span></div>
+              <div class="mission-track" id="missionStrip">◈ ◇ ◇</div>
             </div>
           </div>
           <div class="menu-footer"><div class="menu-option"><label for="qualitySelect">PERFORMANCE PROFILE</label><select id="qualitySelect" aria-label="Graphics quality"><option value="auto">AUTO (RECOMMENDED)</option><option value="high">HIGH</option><option value="medium">MEDIUM</option><option value="low">LOW / PERFORMANCE</option></select></div><button class="sound-toggle" id="soundButton" type="button" aria-pressed="false">♫ SOUND OFF</button><div class="menu-footer-note">RELAY NINE // DEVELOPED WITH THREE.JS</div></div>
         </div>
       </section>
 
-      <dialog id="manualDialog" class="manual-dialog" aria-label="Field manual"><div class="manual-inner"><div class="manual-head"><div><span class="eyebrow">R9 / OPERATOR HANDBOOK</span><h2>FIELD MANUAL</h2></div><button id="closeManual" class="close-button" type="button" aria-label="Close field manual">✕</button></div><p>Get moving, aim at magenta training drones, and destroy six to complete the range directive. Amber maintenance bots are friendly; leave them alone.</p><div class="manual-grid"><div><kbd>W A S D</kbd><span>Move</span></div><div><kbd>MOUSE</kbd><span>Look / aim</span></div><div><kbd>LEFT CLICK</kbd><span>Fire weapon</span></div><div><kbd>SHIFT</kbd><span>Sprint</span></div><div><kbd>SPACE</kbd><span>Jump</span></div><div><kbd>C / CTRL</kbd><span>Slide while moving</span></div><div><kbd>R</kbd><span>Reload</span></div><div><kbd>TAB</kbd><span>Engineering view</span></div><div><kbd>ESC</kbd><span>Pause / release mouse</span></div></div><p class="manual-note">Click Start Operation to capture your mouse. Press Esc to regain the cursor. Audio stays muted until enabled. This is a fictional game simulation, not a production security tool.</p><button id="manualDeploy" class="primary-button" type="button">▶ ENTER THE RANGE</button></div></dialog>
+      <dialog id="manualDialog" class="manual-dialog" aria-label="Field manual"><div class="manual-inner"><div class="manual-head"><div><span class="eyebrow">R9 / OPERATOR HANDBOOK</span><h2>FIELD MANUAL</h2></div><button id="closeManual" class="close-button" type="button" aria-label="Close field manual">✕</button></div><p><strong>Easy mission flow:</strong> 01 Shoot four magenta rogue drones (not the amber friendly). 02 Follow the tall violet beacons and press <kbd>E</kbd> near each to scan. 03 Shoot three red locks, then defeat the big sentinel. The HUD points toward your next objective.</p><div class="manual-grid"><div><kbd>W A S D</kbd><span>Move</span></div><div><kbd>MOUSE</kbd><span>Look / aim</span></div><div><kbd>LEFT CLICK</kbd><span>Fire weapon</span></div><div><kbd>SHIFT</kbd><span>Sprint</span></div><div><kbd>SPACE</kbd><span>Jump</span></div><div><kbd>C / CTRL</kbd><span>Slide while moving</span></div><div><kbd>E</kbd><span>Scan evidence beacon</span></div><div><kbd>R</kbd><span>Reload</span></div><div><kbd>TAB</kbd><span>Engineering view</span></div><div><kbd>ESC</kbd><span>Pause / release mouse</span></div></div><p class="manual-note">Click Start Operation to capture your mouse. Press Esc to regain the cursor. Audio stays muted until enabled. This is a fictional game simulation, not a production security tool.</p><button id="manualDeploy" class="primary-button" type="button">▶ ENTER MISSION</button></div></dialog>
 
       <div class="status-banner" id="statusBanner" hidden role="alert"></div>
     </div>

@@ -120,7 +120,7 @@ export function advancePlayer(
   return next;
 }
 
-export type ShotClassification = 'hostile' | 'neutral' | 'miss';
+export type ShotClassification = 'hostile' | 'neutral' | 'objective' | 'miss';
 
 export function recordShot(previous: RangeStats, classification: ShotClassification, destroyed = false): RangeStats {
   const next = { ...previous, shots: previous.shots + 1 };
@@ -128,6 +128,9 @@ export function recordShot(previous: RangeStats, classification: ShotClassificat
     next.hits += 1;
     next.score += destroyed ? 160 : 40;
     if (destroyed) next.eliminations += 1;
+  } else if (classification === 'objective') {
+    next.hits += 1;
+    next.score += 200;
   } else if (classification === 'neutral') {
     next.falsePositives += 1;
     next.integrity = Math.max(0, next.integrity - 10);

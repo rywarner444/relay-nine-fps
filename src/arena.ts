@@ -4,9 +4,10 @@ import type { Blocker } from './simulation';
 
 export type GraphicsTier = 'low' | 'medium' | 'high';
 export interface ShotResult {
-  kind: 'hostile' | 'neutral' | 'miss';
+  kind: 'hostile' | 'neutral' | 'objective' | 'miss';
   destroyed: boolean;
   point: THREE.Vector3;
+  targetId?: string;
 }
 
 interface Drone {
@@ -17,7 +18,15 @@ interface Drone {
   health: number;
   spawn: THREE.Vector3;
   phase: number;
-  respawn: number;
+  active: boolean;
+  halo: THREE.Mesh;
+}
+
+interface MissionMarker {
+  id: string;
+  group: THREE.Group;
+  meshes: THREE.Object3D[];
+  position: THREE.Vector3;
   active: boolean;
   halo: THREE.Mesh;
 }
@@ -66,6 +75,9 @@ export class RelayNineArena {
   private readonly solidSurfaces: THREE.Object3D[] = [];
   private readonly staticArchitecture: THREE.Mesh[] = [];
   private readonly drones: Drone[] = [];
+  private readonly terminals: MissionMarker[] = [];
+  private readonly securityLocks: MissionMarker[] = [];
+  private readonly sectorScenery: THREE.Group[] = [];
   private readonly impacts: Impact[] = [];
   private readonly animatedRings: { ring: THREE.Mesh; speed: number }[] = [];
   private readonly dataPackets: { mesh: THREE.Mesh; progress: number; speed: number; rail: number }[] = [];
@@ -74,6 +86,7 @@ export class RelayNineArena {
   private muzzleTime = 0;
   private readonly coreLight: THREE.PointLight;
   private readonly ambientLight: THREE.HemisphereLight;
+  private mission = 0;
 
   constructor() {
     this.scene.background = new THREE.Color(0x050d17);
@@ -98,9 +111,12 @@ export class RelayNineArena {
     this.buildCore();
     this.buildCover();
     this.buildDrones();
+    this.buildMissionMarkers();
+    this.buildSectorScenery();
     this.buildWeapon();
     this.particleField = this.buildParticles();
     this.batchStaticArchitecture();
+    this.setMission(0);
   }
 
   private box(
@@ -301,33 +317,35 @@ export class RelayNineArena {
       { id: 'I-03', x: -5.2, y: 2.8, z: -11, phase: 2.1, hostile: true },
       { id: 'I-04', x: 11.6, y: 2.1, z: 3.1, phase: 3.7, hostile: true },
       { id: 'M-01', x: 15.7, y: 1.8, z: 11.8, phase: 1.9, hostile: false },
+      { id: 'SENTINEL', x: 0, y: 4.3, z: -10.2, phase: 0.7, hostile: true },
     ];
 
     for (const spec of specs) {
+      const elite = spec.id === 'SENTINEL';
       const group = new THREE.Group();
       group.position.set(spec.x, spec.y, spec.z);
       this.scene.add(group);
-      const shell = new THREE.MeshStandardMaterial({ color: spec.hostile ? 0x4c1c31 : 0x665036, roughness: 0.35, metalness: 0.85 });
+      const shell = new THREE.MeshStandardMaterial({ color: elite ? 0x8a153f : spec.hostile ? 0x4c1c31 : 0x665036, roughness: 0.35, metalness: 0.85 });
       const glow = spec.hostile ? magentaEmissive : orangeEmissive;
-      const body = new THREE.Mesh(new THREE.IcosahedronGeometry(spec.hostile ? 0.58 : 0.48, 1), shell);
+      const body = new THREE.Mesh(new THREE.IcosahedronGeometry(elite ? 1.3 : spec.hostile ? 0.58 : 0.48, 1), shell);
       group.add(body);
-      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.25, 12, 8), glow);
-      eye.position.z = 0.5;
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(elite ? 0.5 : 0.25, 12, 8), glow);
+      eye.position.z = elite ? 1.15 : 0.5;
       group.add(eye);
-      const halo = new THREE.Mesh(new THREE.TorusGeometry(0.97, 0.038, 7, 44), glow);
+      const halo = new THREE.Mesh(new THREE.TorusGeometry(elite ? 1.95 : 0.97, elite ? 0.095 : 0.038, 7, 44), glow);
       halo.rotation.x = 0.12;
       group.add(halo);
-      const rim = new THREE.Mesh(new THREE.TorusGeometry(0.74, 0.11, 8, 28), darkMetal);
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(elite ? 1.5 : 0.74, elite ? 0.2 : 0.11, 8, 28), darkMetal);
       rim.rotation.x = Math.PI / 2;
       group.add(rim);
       if (spec.hostile) {
         for (const side of [-1, 1]) {
-          const wing = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.12, 0.4), shell);
-          wing.position.set(side * 0.72, 0.02, -0.18);
+          const wing = new THREE.Mesh(new THREE.BoxGeometry(elite ? 1.6 : 0.88, elite ? 0.24 : 0.12, elite ? 0.75 : 0.4), shell);
+          wing.position.set(side * (elite ? 1.7 : 0.72), 0.02, -0.18);
           wing.rotation.z = side * 0.21;
           group.add(wing);
-          const blade = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.055, 0.12), glow);
-          blade.position.set(side * 1.05, 0.08, -0.12);
+          const blade = new THREE.Mesh(new THREE.BoxGeometry(elite ? 1.1 : 0.5, 0.055, 0.12), glow);
+          blade.position.set(side * (elite ? 2.4 : 1.05), 0.08, -0.12);
           group.add(blade);
         }
       } else {
@@ -341,8 +359,79 @@ export class RelayNineArena {
 
       const meshes: THREE.Object3D[] = [];
       group.traverse((obj) => { if (obj instanceof THREE.Mesh) meshes.push(obj); });
-      this.drones.push({ group, meshes, id: spec.id, hostile: spec.hostile, health: 3, phase: spec.phase, spawn: group.position.clone(), respawn: 0, active: true, halo });
+      this.drones.push({ group, meshes, id: spec.id, hostile: spec.hostile, health: elite ? 9 : 3, phase: spec.phase, spawn: group.position.clone(), active: true, halo });
     }
+  }
+
+  private buildMissionMarkers(): void {
+    const evidence = [
+      { id: 'TRACE-A', x: -14, z: 8 },
+      { id: 'TRACE-B', x: 14, z: -5 },
+      { id: 'TRACE-C', x: -7, z: -18 },
+    ];
+    const purple = new THREE.MeshBasicMaterial({ color: 0xac8aff, toneMapped: false });
+    for (const spec of evidence) {
+      const group = new THREE.Group();
+      group.position.set(spec.x, 0, spec.z);
+      this.scene.add(group);
+      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.3, 6.7, 8), purple);
+      shaft.position.y = 3.35;
+      group.add(shaft);
+      const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.75, 0.6, 8), darkMetal);
+      pedestal.position.y = 0.3;
+      group.add(pedestal);
+      const halo = new THREE.Mesh(new THREE.TorusGeometry(1.25, 0.09, 6, 32), purple);
+      halo.rotation.x = Math.PI / 2;
+      halo.position.y = 0.08;
+      group.add(halo);
+      const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.62, 0), purple);
+      crystal.position.y = 2.3;
+      group.add(crystal);
+      this.terminals.push({ id: spec.id, group, meshes: [], position: group.position.clone(), active: true, halo });
+    }
+
+    const locks = [
+      { id: 'LOCK-A', x: -12, y: 3.4, z: -13 },
+      { id: 'LOCK-B', x: 12, y: 3.4, z: -13 },
+      { id: 'LOCK-C', x: 0, y: 5.2, z: -6 },
+    ];
+    const red = new THREE.MeshBasicMaterial({ color: 0xff527a, toneMapped: false });
+    for (const spec of locks) {
+      const group = new THREE.Group();
+      group.position.set(spec.x, spec.y, spec.z);
+      this.scene.add(group);
+      const core = new THREE.Mesh(new THREE.OctahedronGeometry(0.95), red);
+      group.add(core);
+      const halo = new THREE.Mesh(new THREE.TorusGeometry(1.38, 0.12, 8, 32), red);
+      group.add(halo);
+      const outer = new THREE.Mesh(new THREE.TorusGeometry(1.75, 0.035, 6, 32), red);
+      outer.rotation.x = Math.PI / 2;
+      group.add(outer);
+      this.securityLocks.push({ id: spec.id, group, meshes: [core, halo, outer], position: group.position.clone(), active: true, halo });
+    }
+  }
+
+  /** Three authored visual sectors share geometry for a lightweight browser campaign. */
+  private buildSectorScenery(): void {
+    const signal = new THREE.Group();
+    const violet = new THREE.MeshBasicMaterial({ color: 0x9d72fa, toneMapped: false });
+    // Signal-trace sector: tall neon arches identify the evidence-route corridor.
+    for (const z of [12, -2, -16]) {
+      for (const x of [-18, 18]) this.box(x, 4.1, z, 0.14, 8.2, 0.14, violet, signal);
+      this.box(0, 8.2, z, 36, 0.12, 0.16, violet, signal);
+    }
+    this.scene.add(signal);
+    this.sectorScenery.push(signal);
+
+    const quarantine = new THREE.Group();
+    const red = new THREE.MeshBasicMaterial({ color: 0xff567e, toneMapped: false });
+    // Red containment pylons frame the reactor without introducing collision walls.
+    for (const [x, z] of [[-10, -7], [10, -7], [-10, -23], [10, -23]]) {
+      this.box(x, 3.6, z, 0.24, 7.2, 0.24, red, quarantine);
+      this.box(x, 7.1, z, 0.9, 0.15, 0.9, red, quarantine);
+    }
+    this.scene.add(quarantine);
+    this.sectorScenery.push(quarantine);
   }
 
   private buildWeapon(): void {
@@ -392,6 +481,71 @@ export class RelayNineArena {
     return this.drones.filter((drone) => drone.hostile && drone.active).length;
   }
 
+  get sentinelHealth(): number {
+    return this.drones.find((drone) => drone.id === 'SENTINEL')?.health ?? 0;
+  }
+
+  setMission(mission: number): void {
+    if (![0, 1, 2].includes(mission)) throw new RangeError('Unknown level');
+    this.mission = mission;
+    const atmospheres = [0x050d17, 0x100d21, 0x220a17];
+    const fogs = [0x06121e, 0x17102e, 0x220d1b];
+    this.scene.background = new THREE.Color(atmospheres[mission]);
+    if (this.scene.fog instanceof THREE.FogExp2) this.scene.fog.color.setHex(fogs[mission]);
+    this.coreLight.color.setHex([COLOR.cyan, 0xa888ff, 0xff577d][mission]);
+    this.coreLight.intensity = 75;
+    for (const drone of this.drones) {
+      // Each sector deliberately has its own small set of active signatures.
+      const eligible = drone.id === 'M-01' ||
+        mission === 0 && ['I-01', 'I-02', 'I-03', 'I-04'].includes(drone.id) ||
+        mission === 1 && ['I-01', 'I-02'].includes(drone.id) ||
+        mission === 2 && ['I-03', 'I-04'].includes(drone.id);
+      drone.health = drone.id === 'SENTINEL' ? 9 : 3;
+      drone.active = eligible;
+      drone.group.visible = eligible;
+      drone.group.position.copy(drone.spawn);
+    }
+    for (const marker of this.terminals) {
+      marker.active = true;
+      marker.group.visible = mission === 1;
+    }
+    for (const marker of this.securityLocks) {
+      marker.active = true;
+      marker.group.visible = mission === 2;
+    }
+    this.sectorScenery.forEach((group, index) => { group.visible = mission === index + 1; });
+  }
+
+  /** An operator must physically approach an evidence beacon to collect it. */
+  scanNearby(x: number, z: number): string | null {
+    if (this.mission !== 1) return null;
+    const nearby = this.terminals.find((marker) =>
+      marker.active && Math.hypot(marker.position.x - x, marker.position.z - z) <= 3.1,
+    );
+    if (!nearby) return null;
+    nearby.active = false;
+    nearby.group.visible = false;
+    this.spawnImpact(nearby.position.clone().add(new THREE.Vector3(0, 2, 0)), 0xad8fff, 0.75);
+    return nearby.id;
+  }
+
+  getWaypoint(x: number, z: number): { id: string; distance: number; dx: number; dz: number } | null {
+    const candidates = this.mission === 0
+      ? this.drones.filter((drone) => drone.hostile && drone.active)
+      : this.mission === 1
+        ? this.terminals.filter((marker) => marker.active)
+        : this.securityLocks.some((marker) => marker.active)
+          ? this.securityLocks.filter((marker) => marker.active)
+          : this.drones.filter((drone) => drone.id === 'SENTINEL' && drone.active);
+    const closest = candidates.map((marker) => {
+      const position = 'spawn' in marker ? marker.group.position : marker.position;
+      const dx = position.x - x;
+      const dz = position.z - z;
+      return { id: marker.id, distance: Math.hypot(dx, dz), dx, dz };
+    }).sort((a, b) => a.distance - b.distance);
+    return closest[0] ?? null;
+  }
+
   setGraphicsTier(tier: GraphicsTier): void {
     this.particleField.visible = tier !== 'low';
     this.ambientLight.intensity = tier === 'low' ? 1.3 : 1.15;
@@ -400,13 +554,7 @@ export class RelayNineArena {
   }
 
   resetDrones(): void {
-    for (const drone of this.drones) {
-      drone.health = 3;
-      drone.active = true;
-      drone.respawn = 0;
-      drone.group.visible = true;
-      drone.group.position.copy(drone.spawn);
-    }
+    this.setMission(this.mission);
   }
 
   fire(): ShotResult {
@@ -418,12 +566,24 @@ export class RelayNineArena {
     this.raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera);
     this.raycaster.far = 90;
     const hittable = this.drones.filter((drone) => drone.active).flatMap((drone) => drone.meshes);
-    const hits = this.raycaster.intersectObjects([...hittable, ...this.solidSurfaces], false);
+    const locks = this.mission === 2 ? this.securityLocks.filter((marker) => marker.active).flatMap((marker) => marker.meshes) : [];
+    const hits = this.raycaster.intersectObjects([...hittable, ...locks, ...this.solidSurfaces], false);
     const hit = hits[0];
     if (!hit) {
       return { kind: 'miss', destroyed: false, point: this.camera.position.clone().add(this.camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(50)) };
     }
 
+    const securityLock = this.securityLocks.find((item) => this.mission === 2 && item.active && item.meshes.includes(hit.object));
+    if (securityLock) {
+      securityLock.active = false;
+      securityLock.group.visible = false;
+      this.spawnImpact(hit.point, COLOR.magenta, 1);
+      if (this.securityLocks.every((marker) => !marker.active)) {
+        const sentinel = this.drones.find((drone) => drone.id === 'SENTINEL');
+        if (sentinel) { sentinel.active = true; sentinel.group.visible = true; }
+      }
+      return { kind: 'objective', destroyed: true, point: hit.point, targetId: securityLock.id };
+    }
     const drone = this.drones.find((item) => item.active && item.meshes.includes(hit.object));
     if (!drone) {
       this.spawnImpact(hit.point, COLOR.cyanDeep, 0.22);
@@ -431,16 +591,15 @@ export class RelayNineArena {
     }
 
     this.spawnImpact(hit.point, drone.hostile ? COLOR.magenta : COLOR.orange, 0.5);
-    if (!drone.hostile) return { kind: 'neutral', destroyed: false, point: hit.point };
+    if (!drone.hostile) return { kind: 'neutral', destroyed: false, point: hit.point, targetId: drone.id };
     drone.health -= 1;
     const destroyed = drone.health <= 0;
     if (destroyed) {
       drone.active = false;
-      drone.respawn = 4.0;
       drone.group.visible = false;
       this.spawnImpact(drone.group.position, COLOR.magenta, 1.6);
     }
-    return { kind: 'hostile', destroyed, point: hit.point };
+    return { kind: 'hostile', destroyed, point: hit.point, targetId: drone.id };
   }
 
   private spawnImpact(point: THREE.Vector3, color: number, size: number): void {
@@ -457,16 +616,14 @@ export class RelayNineArena {
     this.coreLight.intensity += (68 + Math.sin(time * 1.7) * 9 - this.coreLight.intensity) * Math.min(delta * 2, 1);
     for (const { ring, speed } of this.animatedRings) ring.rotation.z += delta * speed;
 
+    for (const marker of [...this.terminals, ...this.securityLocks]) {
+      if (!marker.active) continue;
+      marker.halo.rotation.z += delta * (this.mission === 2 ? 0.75 : 0.22);
+      marker.halo.scale.setScalar(1 + Math.sin(time * 2.4 + marker.position.x) * 0.08);
+    }
+
     for (const drone of this.drones) {
-      if (!drone.active) {
-        drone.respawn -= delta;
-        if (drone.respawn <= 0) {
-          drone.active = true;
-          drone.health = 3;
-          drone.group.visible = true;
-        }
-        continue;
-      }
+      if (!drone.active) continue;
       const drift = Math.sin(time * 0.8 + drone.phase) * (drone.hostile ? 0.65 : 0.27);
       drone.group.position.set(
         drone.spawn.x + Math.cos(time * 0.65 + drone.phase) * (drone.hostile ? 0.5 : 0.15),

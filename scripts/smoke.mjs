@@ -34,17 +34,18 @@ try {
   await page.screenshot({ path: 'artifacts/menu.png' });
   await page.getByRole('button', { name: /field manual/i }).click();
   await page.getByRole('heading', { name: /field manual/i }).waitFor();
-  await page.getByRole('button', { name: /enter the range/i }).click();
+  await page.getByRole('button', { name: /enter mission/i }).click();
   await page.locator('#hudTop').waitFor({ state: 'visible' });
   await page.waitForTimeout(1200);
   await page.screenshot({ path: 'artifacts/gameplay.png' });
 
   const ammo = await page.locator('#ammoValue').textContent();
   assert.equal(ammo, '30', 'Weapon HUD should initialize with a full magazine');
-  assert.ok((await page.locator('#objectiveTitle').textContent())?.includes('Clear the hostile'));
+  assert.ok((await page.locator('#objectiveTitle').textContent())?.includes('Identify and contain'));
+  assert.equal(await page.locator('#objectiveCount').textContent(), '0 / 4');
   assert.equal(await page.locator('#menuOverlay').isVisible(), false);
   assert.equal(errors.length, 0, `Browser errors: ${errors.join('; ')}`);
-  process.stdout.write('Smoke test passed: loaded 3D menu, field manual, deployed gameplay and weapon HUD.\n');
+  process.stdout.write('Smoke test passed: loaded 3D campaign menu, field manual, first mission and weapon HUD.\n');
 } finally {
   await browser?.close();
   server.kill('SIGTERM');

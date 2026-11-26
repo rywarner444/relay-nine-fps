@@ -14,12 +14,14 @@ test('every UI reference in the game controller exists in the HTML', () => {
   for (const id of referenced) assert.ok(ids.has(id), `UI element '${id}' is missing`);
 });
 
-test('field manual and initial range have discoverable instructions', () => {
+test('field manual and three-mission campaign have discoverable instructions', () => {
   assert.match(html, /FIELD MANUAL/);
   assert.match(html, /START OPERATION/);
   assert.match(html, /id="qualitySelect"/);
   assert.match(html, /id="restartButton"/);
   assert.match(html, /press Esc/i);
+  assert.match(html, /E<\/kbd>/);
+  assert.match(html, /MISSION 01 \/ 03/);
 });
 
 test('Relay Nine uses a distinct combat HUD identity and visible slide cue', () => {
@@ -28,10 +30,13 @@ test('Relay Nine uses a distinct combat HUD identity and visible slide cue', () 
   assert.match(css, /--violet:\s*#aa8dff/i);
   assert.match(html, /id="slideStatus"/);
   assert.match(html, /id="fpsChip"/);
+  assert.match(html, /id="waypointPanel"/);
+  assert.match(html, /id="debrief"/);
 });
 
-test('the prototype distinguishes shipped mechanics from future work', () => {
-  assert.match(readme, /adaptive director.*planned/i);
+test('the campaign distinguishes scripted game rules from real AI or security telemetry', () => {
+  assert.match(readme, /adaptive AI.*not implemented/i);
+  assert.match(readme, /three levels/i);
   assert.match(readme, /no real security telemetry/i);
   assert.match(readme, /private/i);
 });
