@@ -3,81 +3,84 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { RelayNineArena } from '../src/arena.ts';
 
-test('Relay Nine creates a large navigable facility with corridors, cover and drones', () => {
-  const arena = new RelayNineArena();
-  assert.ok(arena.scene.children.length > 30, 'Batched world should still contain interactive scene elements');
-  assert.ok(arena.blockers.length > 20);
-  assert.equal(arena.activeHostiles, 4);
-  assert.ok(arena.scene.fog);
-  assert.ok(arena.camera.parent === arena.scene);
-  arena.setGraphicsTier('low');
-  arena.update(0.016, 1, 0, false);
+test('the three mission maps have distinct navigable collision layouts and threat counts', () => {
+  const levels = [new RelayNineArena(0), new RelayNineArena(1), new RelayNineArena(2)];
+  assert.deepEqual(levels.map((arena) => arena.activeHostiles), [8, 8, 5]);
+  const mapSignature = (arena: RelayNineArena): string => arena.blockers
+    .map((b) => `${b.x},${b.z},${b.halfWidth}`).join('|');
+  assert.equal(new Set(levels.map(mapSignature)).size, 3);
+  for (const arena of levels) {
+    assert.ok(arena.scene.children.length > 30);
+    assert.ok(arena.camera.parent === arena.scene);
+    arena.setGraphicsTier('low');
+    arena.update(0.016, 1, 0, false);
+    arena.dispose();
+  }
 });
 
-test('static geometry batching reduces GPU draw calls without reducing world detail', () => {
+test('batched environments keep the first mission GPU mesh footprint controlled', () => {
   const arena = new RelayNineArena();
   let meshCount = 0;
   arena.scene.traverseVisible((object) => { if (object instanceof THREE.Mesh) meshCount += 1; });
-  assert.ok(meshCount < 165, `Expected fewer than 165 visible meshes, got ${meshCount}`);
-  assert.ok(arena.scene.children.length < 90, 'Batched scenery should reduce scene traversal');
+  assert.ok(meshCount < 260, `Expected fewer than 260 visible meshes, got ${meshCount}`);
+  assert.ok(arena.scene.children.length < 100, 'Batched scenery should reduce scene traversal');
+  arena.dispose();
 });
 
-test('raycast shooting registers hostile hits and disables destroyed range drones', () => {
-  const arena = new RelayNineArena();
+test('carrier combat creates a world drop that needs proximity and E interaction', () => {
+  const arena = new RelayNineArena(0);
   arena.camera.lookAt(new THREE.Vector3(-5, 2.8, 25));
   arena.camera.updateMatrixWorld(true);
   assert.equal(arena.fire().kind, 'hostile');
   const last = arena.fire();
-  assert.equal(last.kind, 'hostile');
-  assert.equal(last.destroyed, true);
   assert.equal(last.targetId, 'I-01');
-  assert.equal(arena.activeHostiles, 3);
-  arena.update(4.1, 4.1, 0, false);
-  assert.equal(arena.activeHostiles, 3, 'Campaign threats remain contained and do not respawn');
+  assert.equal(last.destroyed, true);
+  assert.equal(arena.activeHostiles, 7);
+  assert.equal(arena.scanNearby(0, 42), null, 'Pickup cannot be collected remotely');
+  assert.equal(arena.scanNearby(-5, 25), 'FRAG-A');
+  assert.equal(arena.scanNearby(-5, 25), null, 'Pickup cannot be collected twice');
+  assert.equal(arena.getWaypoint(-5, 25)?.id, 'CARRIER FRAG-C');
+  arena.update(8, 8, 0, false);
+  assert.equal(arena.activeHostiles, 7, 'Initial mission enemies do not respawn');
+  arena.dispose();
 });
 
-test('neutral maintenance targets register separately from hostile drones', () => {
-  const arena = new RelayNineArena();
+test('friendly maintenance target is protected by false-positive rules', () => {
+  const arena = new RelayNineArena(0);
   arena.camera.lookAt(new THREE.Vector3(8, 1.8, 36));
   arena.camera.updateMatrixWorld(true);
-  const shot = arena.fire();
-  assert.equal(shot.kind, 'neutral');
-  assert.equal(shot.destroyed, false);
+  assert.equal(arena.fire().kind, 'neutral');
+  arena.dispose();
 });
 
-test('signal-trace level lets the operator scan three different evidence beacons with distance checks', () => {
-  const arena = new RelayNineArena();
-  arena.setMission(1);
-  assert.equal(arena.scanNearby(0, 42), null);
-  assert.equal(arena.scanNearby(-29, 14), 'TRACE-A');
-  assert.equal(arena.scanNearby(-29, 14), null, 'Evidence cannot be claimed twice');
-  assert.equal(arena.scanNearby(29, -15), 'TRACE-B');
-  assert.equal(arena.scanNearby(-11, -48), 'TRACE-C');
-  assert.equal(arena.getWaypoint(0, 42), null);
-});
-
-test('rogue AI locks open the vault, expose a 42-hit mech boss, then activate the shutdown console', () => {
-  const arena = new RelayNineArena();
-  arena.setMission(2);
-  assert.equal(arena.activeHostiles, 2);
-  const locks = [
-    { id: 'LOCK-A', point: [-30, 3.4, -18], camera: [-30, 1.72, -10] },
-    { id: 'LOCK-B', point: [30, 3.4, -18], camera: [30, 1.72, -10] },
-    { id: 'LOCK-C', point: [0, 5.2, -27], camera: [0, 1.72, -17] },
-  ] as const;
-  assert.equal(arena.blockers.some((blocker) => blocker.z === -34 && blocker.x === 0), true);
-  for (const { id, point, camera } of locks) {
-    arena.camera.position.set(...camera);
-    arena.camera.lookAt(new THREE.Vector3(...point));
-    arena.camera.updateMatrixWorld(true);
-    const hit = arena.fire();
-    assert.equal(hit.kind, 'objective', `Expected to hit ${id} rather than ${hit.kind}`);
-    assert.equal(hit.targetId, id);
+test('tower capture needs nine seconds in each of three distinct world-space radii', () => {
+  const arena = new RelayNineArena(1);
+  assert.equal(arena.scanNearby(-29, 18), null, 'Cannot press E to bypass tower charging');
+  const outside = arena.updateCapture(0, 42, 0.05);
+  assert.equal(outside?.inRange, false);
+  assert.equal(outside?.percent, 0);
+  const sites = [
+    { id: 'TRACE-A', x: -29, z: 18 },
+    { id: 'TRACE-B', x: 27, z: 6 },
+    { id: 'TRACE-C', x: 0, z: -30 },
+  ];
+  for (const site of sites) {
+    let capture = arena.updateCapture(site.x, site.z, 0.05);
+    assert.equal(capture?.id, site.id);
+    assert.equal(capture?.inRange, true);
+    for (let i = 0; i < 182 && !capture?.completed; i += 1) capture = arena.updateCapture(site.x, site.z, 0.05);
+    assert.equal(capture?.completed, true);
   }
-  assert.equal(arena.activeHostiles, 3);
-  assert.equal(arena.blockers.some((blocker) => blocker.z === -34 && blocker.x === 0), false);
-  arena.camera.position.set(7, 1.72, -42);
-  arena.camera.lookAt(new THREE.Vector3(0, 5, -48));
+  assert.equal(arena.getWaypoint(0, 42), null);
+  arena.dispose();
+});
+
+test('mobile 110-hit mech is immediately active; its destruction alone ends the boss objective', () => {
+  const arena = new RelayNineArena(2);
+  assert.equal(arena.sentinelHealth, 110);
+  assert.equal(arena.getWaypoint(0, 35)?.id, 'SENTINEL');
+  arena.camera.position.set(0, 1.72, 24);
+  arena.camera.lookAt(new THREE.Vector3(0, 5.1, -12));
   arena.camera.updateMatrixWorld(true);
   for (let i = 0; i < arena.sentinelMaxHealth; i += 1) {
     const hit = arena.fire();
@@ -86,31 +89,50 @@ test('rogue AI locks open the vault, expose a 42-hit mech boss, then activate th
     assert.equal(hit.destroyed, i === arena.sentinelMaxHealth - 1);
   }
   assert.equal(arena.sentinelHealth, 0);
-  assert.equal(arena.getWaypoint(0, -45)?.id, 'SHUTDOWN');
-  assert.equal(arena.scanNearby(0, -51), 'SHUTDOWN');
-  assert.equal(arena.scanNearby(0, -51), null, 'Network shutdown can happen only once');
+  assert.equal(arena.getWaypoint(0, 35), null);
+  assert.equal(arena.scanNearby(0, -12), null, 'No console or other final requirement');
+  arena.dispose();
 });
 
-test('patrolling guards move and eventually hit an exposed stationary operator with projectiles', () => {
-  const arena = new RelayNineArena();
-  const initial = arena.tacticalBlips.find((blip) => blip.type === 'hostile');
-  assert.ok(initial);
-  let incoming = 0;
-  for (let i = 0; i < 200; i += 1) incoming += arena.update(0.05, i * 0.05, 0, false, { x: 0, y: 1.3, z: 31 });
+test('boss patrols while defeated drone escorts return as timed reinforcements', () => {
+  const arena = new RelayNineArena(2);
+  const original = arena.tacticalBlips.find((blip) => blip.type === 'boss');
+  assert.ok(original);
+  arena.camera.position.set(-18, 1.72, 35);
+  arena.camera.lookAt(new THREE.Vector3(-18, 3, 19));
+  arena.camera.updateMatrixWorld(true);
+  for (let i = 0; i < 3; i += 1) assert.equal(arena.fire().targetId, 'I-23');
+  assert.equal(arena.activeHostiles, 4);
+  for (let i = 0; i < 220; i += 1) arena.update(0.05, i * 0.05, 0, false, { x: 0, y: 1.3, z: 36 });
+  assert.ok(arena.activeHostiles >= 6, 'Escort should respawn and a fresh reinforcement should join the battle');
+  const moved = arena.tacticalBlips.find((blip) => blip.type === 'boss');
+  assert.ok(moved);
+  assert.ok(Math.hypot(moved.x - original.x, moved.z - original.z) > 7, 'Sentinel should change world position');
+  arena.dispose();
+});
+
+test('base-floor guards patrol and shoot an exposed operator', () => {
+  const arena = new RelayNineArena(0);
+  const original = arena.tacticalBlips.find((blip) => blip.type === 'hostile');
+  assert.ok(original);
+  let damage = 0;
+  for (let i = 0; i < 240; i += 1) damage += arena.update(0.05, i * 0.05, 0, false, { x: 0, y: 1.3, z: 31 });
+  assert.ok(damage > 0, 'Hostiles should fire incoming projectiles');
   const after = arena.tacticalBlips.find((blip) => blip.type === 'hostile');
   assert.ok(after);
-  assert.ok(Math.hypot(after.x - initial.x, after.z - initial.z) > 2, 'Guard should visibly patrol');
-  assert.ok(incoming > 0, 'Uncovered player should receive damage');
+  assert.ok(Math.hypot(after.x - original.x, after.z - original.z) > 2);
+  arena.dispose();
 });
 
-test('corridor walls stop shots until players navigate to the correct side-wing opening', () => {
-  const arena = new RelayNineArena();
+test('facility walls still block gunfire until player navigates through the wing', () => {
+  const arena = new RelayNineArena(0);
   arena.camera.position.set(0, 1.72, 35);
   arena.camera.lookAt(new THREE.Vector3(-26, 2.8, 13));
   arena.camera.updateMatrixWorld(true);
-  assert.equal(arena.fire().kind, 'miss', 'Solid corridor walls must protect enemies behind them');
+  assert.equal(arena.fire().kind, 'miss');
   arena.camera.position.set(-26, 1.72, 19);
   arena.camera.lookAt(new THREE.Vector3(-26, 2.8, 13));
   arena.camera.updateMatrixWorld(true);
   assert.equal(arena.fire().targetId, 'I-03');
+  arena.dispose();
 });

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { FACILITY_WALLS, FACILITY_START, VAULT_DOOR } from '../src/facility.ts';
+import { FACILITY_WALLS, FACILITY_START } from '../src/facility.ts';
 import { pointBlocked } from '../src/combat.ts';
 import { RelayNineArena } from '../src/arena.ts';
 import type { Blocker } from '../src/simulation.ts';
@@ -32,27 +32,33 @@ function reachable(targetX: number, targetZ: number, barriers: readonly Blocker[
   return false;
 }
 
-test('every mission objective is reachable through an authored hallway or door', () => {
+test('original base-floor carrier and computer locations are reachable through corridor openings', () => {
   const staticWalls = [...FACILITY_WALLS, { x: 0, z: -40, halfWidth: 3.3, halfDepth: 3.3 }];
-  for (const [x, z] of [[-29, 14], [29, -15], [-11, -48], [-30, -18], [30, -18], [0, -27], [0, -51]]) {
+  for (const [x, z] of [[-5, 25], [26, -18], [24, 25], [0, -47]]) {
     assert.ok(reachable(x, z, staticWalls), `Expected navigable route from spawn to ${x}, ${z}`);
   }
 });
 
-test('the north vault is closed until its three security locks are disabled', () => {
-  const barriers = [...FACILITY_WALLS, VAULT_DOOR];
-  assert.equal(reachable(0, -49, barriers), false);
-  assert.equal(reachable(0, -27, barriers), true);
+test('new base-floor objectives remain reachable when actual crates and server cover are included', () => {
+  const arena = new RelayNineArena(0);
+  for (const [x, z] of [[-5, 25], [26, -18], [24, 25], [0, -47]]) {
+    assert.ok(reachable(x, z, arena.blockers), `World pickup/computer ${x}, ${z} is obstructed`);
+  }
+  arena.dispose();
 });
 
-test('real in-game cover does not accidentally block the side wing or vault objectives', () => {
-  const arena = new RelayNineArena();
-  arena.setMission(1);
-  for (const [x, z] of [[-29, 14], [29, -15], [-11, -48]]) {
-    assert.ok(reachable(x, z, arena.blockers), `Mission 2 location ${x}, ${z} is obstructed`);
+test('real collision cover leaves all foundry tower charging radii accessible', () => {
+  const arena = new RelayNineArena(1);
+  for (const [x, z] of [[-29, 18], [27, 6], [0, -30]]) {
+    assert.ok(reachable(x, z, arena.blockers), `Mission 2 tower ${x}, ${z} is obstructed`);
   }
-  arena.setMission(2);
-  for (const [x, z] of [[-30, -18], [30, -18], [0, -27]]) {
-    assert.ok(reachable(x, z, arena.blockers), `Mission 3 lock ${x}, ${z} is obstructed`);
+  arena.dispose();
+});
+
+test('open boss arena has multiple unobstructed approaches to the sentinel', () => {
+  const arena = new RelayNineArena(2);
+  for (const [x, z] of [[0, -12], [-15, -14], [15, -14], [0, 23]]) {
+    assert.ok(reachable(x, z, arena.blockers), `Boss map position ${x}, ${z} is obstructed`);
   }
+  arena.dispose();
 });

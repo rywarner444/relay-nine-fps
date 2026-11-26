@@ -4,6 +4,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import type { Blocker } from './simulation';
 import { ENEMY_TIERS, BOSS_TUNING, advanceBolt, pointBlocked, segmentBlocked, type Position3 } from './combat';
 import { FACILITY_WALLS, FACILITY_DOORWAYS, VAULT_DOOR } from './facility';
+import { CAPTURE_RADIUS, advanceCapture, type CaptureState } from './objectives';
 
 export type GraphicsTier = 'low' | 'medium' | 'high';
 export interface ShotResult {
@@ -29,6 +30,10 @@ interface Drone {
   attackClock: number;
   boss: boolean;
   limbParts?: THREE.Object3D[];
+  dropId?: string;
+  respawnDelay?: number;
+  respawnClock: number;
+  initialDelay?: number;
 }
 
 interface EnemyBolt {
@@ -45,6 +50,14 @@ interface MissionMarker {
   position: THREE.Vector3;
   active: boolean;
   halo: THREE.Mesh;
+  capture: CaptureState;
+}
+
+interface Fragment {
+  id: string;
+  group: THREE.Group;
+  position: THREE.Vector3;
+  collected: boolean;
 }
 
 interface Impact {
@@ -125,14 +138,12 @@ export class RelayNineArena {
   private readonly staticArchitecture: THREE.Mesh[] = [];
   private readonly drones: Drone[] = [];
   private readonly terminals: MissionMarker[] = [];
-  private readonly securityLocks: MissionMarker[] = [];
-  private readonly sectorScenery: THREE.Group[] = [];
+  private readonly fragments: Fragment[] = [];
   private readonly impacts: Impact[] = [];
   private readonly enemyBolts: EnemyBolt[] = [];
   private readonly boltGeometry = new THREE.SphereGeometry(0.15, 8, 6);
   private readonly boltMaterial = new THREE.MeshBasicMaterial({ color: 0xff597b, toneMapped: false });
   private readonly bossBoltMaterial = new THREE.MeshBasicMaterial({ color: 0xffa857, toneMapped: false });
-  private bossBlocker: Blocker | null = null;
   private readonly animatedRings: { ring: THREE.Mesh; speed: number }[] = [];
   private readonly dataPackets: { mesh: THREE.Mesh; progress: number; speed: number; rail: number }[] = [];
   private readonly particleField: THREE.Points;
@@ -140,13 +151,14 @@ export class RelayNineArena {
   private muzzleTime = 0;
   private readonly coreLight: THREE.PointLight;
   private readonly ambientLight: THREE.HemisphereLight;
-  private readonly vaultShutter: THREE.Mesh;
+  private readonly vaultShutter: THREE.Mesh | null;
   private readonly shutdownConsole: THREE.Group;
-  private vaultClosed = false;
   private shutdownComplete = false;
-  private mission = 0;
+  private readonly mission: number;
 
-  constructor() {
+  constructor(mission = 0) {
+    if (![0, 1, 2].includes(mission)) throw new RangeError('Unknown level');
+    this.mission = mission;
     this.scene.background = new THREE.Color(0x050d17);
     this.scene.fog = new THREE.FogExp2(0x06121e, 0.011);
     this.camera.position.set(0, 1.72, 42);
@@ -161,23 +173,22 @@ export class RelayNineArena {
     warm.position.set(-14, 4, -9);
     this.scene.add(warm);
     this.coreLight = new THREE.PointLight(COLOR.cyan, 75, 37, 1.6);
-    this.coreLight.position.set(0, 6.5, -39);
+    this.coreLight.position.set(0, 6.5, mission === 0 ? -39 : mission === 1 ? -5 : -12);
     this.scene.add(this.coreLight);
 
     this.buildFloor();
-    this.buildArchitecture();
-    this.buildFacility();
-    this.buildCore();
-    this.buildCover();
+    if (mission !== 2) this.buildArchitecture();
+    if (mission === 0) { this.buildFacility(); this.buildCore(); this.buildCover(); }
+    else if (mission === 1) this.buildFoundry();
+    else this.buildBossArena();
     this.buildDrones();
-    this.buildMissionMarkers();
-    this.shutdownConsole = this.buildShutdownConsole();
-    this.vaultShutter = this.buildVaultShutter();
-    this.buildSectorScenery();
+    if (mission === 1) this.buildMissionMarkers();
+    this.shutdownConsole = mission === 0 ? this.buildShutdownConsole() : new THREE.Group();
+    this.vaultShutter = mission === 0 ? this.buildVaultShutter() : null;
     this.buildWeapon();
     this.particleField = this.buildParticles();
     this.batchStaticArchitecture();
-    this.setMission(0);
+    this.setMission(mission);
   }
 
   private box(
@@ -252,14 +263,15 @@ export class RelayNineArena {
       this.strip(0, 0.038, z, 82, 0.014, 0.028);
     }
 
-    // Navigation platform underneath the network core.
-    const platform = new THREE.Mesh(new THREE.CylinderGeometry(5.7, 6.2, 0.19, 48), darkMetal);
-    platform.position.set(0, 0.035, -39);
-    this.scene.add(platform);
-    const circle = new THREE.Mesh(new THREE.TorusGeometry(5.8, 0.075, 8, 64), cyanEmissive);
-    circle.position.set(0, 0.15, -39);
-    circle.rotation.x = Math.PI / 2;
-    this.scene.add(circle);
+    if (this.mission === 0) {
+      const platform = new THREE.Mesh(new THREE.CylinderGeometry(5.7, 6.2, 0.19, 48), darkMetal);
+      platform.position.set(0, 0.035, -39);
+      this.scene.add(platform);
+      const circle = new THREE.Mesh(new THREE.TorusGeometry(5.8, 0.075, 8, 64), cyanEmissive);
+      circle.position.set(0, 0.15, -39);
+      circle.rotation.x = Math.PI / 2;
+      this.scene.add(circle);
+    }
   }
 
   private buildArchitecture(): void {
@@ -402,14 +414,114 @@ export class RelayNineArena {
     }
   }
 
+  /** Foundry: three separated capture courtyards connected by broad, flanked lanes. */
+  private buildFoundry(): void {
+    const violet = new THREE.MeshBasicMaterial({ color: 0xa88bff, toneMapped: false });
+    const walls: readonly [number, number, number, number][] = [
+      [-37, 2, 1.2, 67], [37, 2, 1.2, 67], [-19, 39, 32, 1.2], [19, 39, 32, 1.2],
+      [-15, 8, 1.4, 22], [15, -13, 1.4, 21], [-21, -38, 24, 1.2], [21, -38, 24, 1.2],
+      [-14, -40, 1.4, 19], [14, 29, 1.4, 19],
+    ];
+    for (const [x, z, w, d] of walls) {
+      this.box(x, 3.3, z, w, 6.6, d, darkMetal, this.scene, true);
+      this.blockers.push({ x, z, halfWidth: w / 2, halfDepth: d / 2 });
+      this.box(x, 6.66, z, w, 0.15, d, violet);
+    }
+    // Industrial refinery rigs are recognizably different from server-room corridors.
+    for (const [x, z] of [[-31, -12], [31, 27], [-30, -28], [31, -32], [-6, -47], [8, 45]]) {
+      const tank = new THREE.Mesh(new THREE.CylinderGeometry(2.15, 2.4, 6, 12), trim);
+      tank.position.set(x, 3, z);
+      this.scene.add(tank);
+      for (const y of [1.6, 4.3]) {
+        const rim = new THREE.Mesh(new THREE.TorusGeometry(2.28, 0.11, 6, 20), orangeEmissive);
+        rim.rotation.x = Math.PI / 2;
+        rim.position.set(x, y, z);
+        this.scene.add(rim);
+      }
+      this.blockers.push({ x, z, halfWidth: 2.3, halfDepth: 2.3 });
+      this.solidSurfaces.push(tank);
+    }
+    for (const [x, z] of [[-16, -25], [17, 23], [-24, 40], [23, -20], [0, 13], [0, -11]]) {
+      this.box(x, 1.15, z, 3.3, 2.3, 2.4, deepMetal, this.scene, true);
+      this.strip(x, 2.34, z, 3.5, 0.08, 2.5);
+      this.blockers.push({ x, z, halfWidth: 1.65, halfDepth: 1.2 });
+    }
+    for (const [x, z] of [[-29, 18], [27, 6], [0, -30]]) {
+      const disk = new THREE.Mesh(new THREE.CylinderGeometry(CAPTURE_RADIUS, CAPTURE_RADIUS, 0.04, 48),
+        new THREE.MeshBasicMaterial({ color: 0x7953cd, transparent: true, opacity: 0.13, depthWrite: false }));
+      disk.position.set(x, 0.065, z);
+      this.scene.add(disk);
+      const perimeter = new THREE.Mesh(new THREE.TorusGeometry(CAPTURE_RADIUS, 0.13, 6, 64), violet);
+      perimeter.rotation.x = Math.PI / 2;
+      perimeter.position.set(x, 0.1, z);
+      this.scene.add(perimeter);
+      this.animatedRings.push({ ring: perimeter, speed: 0 });
+    }
+  }
+
+  /** Unobstructed circular combat floor: clear sightlines, perimeter cover, mobile boss. */
+  private buildBossArena(): void {
+    const red = new THREE.MeshBasicMaterial({ color: 0xff597c, toneMapped: false });
+    const violet = new THREE.MeshBasicMaterial({ color: 0x957aff, toneMapped: false });
+    for (const radius of [11, 22, 34, 40]) {
+      const circle = new THREE.Mesh(new THREE.TorusGeometry(radius, radius === 40 ? 0.23 : 0.09, 6, 96), radius % 2 ? violet : red);
+      circle.rotation.x = Math.PI / 2;
+      circle.position.y = 0.075;
+      this.scene.add(circle);
+    }
+    for (let index = 0; index < 12; index += 1) {
+      const angle = index / 12 * Math.PI * 2;
+      const x = Math.sin(angle) * 41;
+      const z = Math.cos(angle) * 42;
+      this.box(x, 6.8, z, 2.6, 13.6, 2.6, darkMetal);
+      this.box(x, 11.5, z, 2.9, 0.16, 2.9, red);
+      this.strip(x, 4.3, z + (z < 0 ? 1.36 : -1.36), 0.11, 5.9, 0.1, true);
+    }
+    for (const [x, z, w, d] of [[-25, 22, 4, 6], [25, 22, 4, 6], [-28, -14, 5, 4], [28, -14, 5, 4], [-12, -34, 5, 4], [12, -34, 5, 4]]) {
+      this.box(x, 1.45, z, w, 2.9, d, trim, this.scene, true);
+      this.box(x, 2.95, z, w + 0.18, 0.12, d + 0.18, red);
+      this.blockers.push({ x, z, halfWidth: w / 2, halfDepth: d / 2 });
+    }
+    const platform = new THREE.Mesh(new THREE.CylinderGeometry(8.6, 9.1, 0.24, 48), deepMetal);
+    platform.position.set(0, 0.025, -12);
+    this.scene.add(platform);
+    this.scene.fog = new THREE.FogExp2(0x2b0c22, 0.007);
+  }
+
   private buildDrones(): void {
-    const specs = [
-      { id: 'I-01', x: -5, y: 2.8, z: 25, phase: 0, hostile: true, route: [[-5, 25], [5, 23], [5, 14], [-5, 17]] },
+    type Spec = { id: string; x: number; y: number; z: number; phase: number; hostile: boolean;
+      route: number[][]; dropId?: string; respawnDelay?: number; initialDelay?: number };
+    const base: Spec[] = [
+      { id: 'I-01', x: -5, y: 2.8, z: 25, phase: 0, hostile: true, dropId: 'FRAG-A', route: [[-5, 25], [5, 23], [5, 14], [-5, 17]] },
       { id: 'I-02', x: 6, y: 3.1, z: -3, phase: 1.3, hostile: true, route: [[6, -3], [-6, -3], [-5, -16], [6, -16]] },
       { id: 'I-03', x: -26, y: 2.8, z: 13, phase: 2.1, hostile: true, route: [[-26, 13], [-32, 8], [-28, -15], [-22, -15]] },
-      { id: 'I-04', x: 26, y: 3, z: -18, phase: 3.7, hostile: true, route: [[26, -18], [32, -12], [27, 14], [22, 14]] },
+      { id: 'I-04', x: 26, y: 3, z: -18, phase: 3.7, hostile: true, dropId: 'FRAG-B', route: [[26, -18], [32, -12], [27, 14], [22, 14]] },
+      { id: 'I-05', x: -4, y: 2.8, z: 9, phase: 0.8, hostile: true, route: [[-4, 9], [4, 9], [4, 19], [-4, 19]] },
+      { id: 'I-06', x: -27, y: 2.8, z: -22, phase: 2.8, hostile: true, route: [[-27, -22], [-31, -13], [-26, 0], [-22, 0]] },
+      { id: 'I-07', x: 24, y: 2.8, z: 25, phase: 4.2, hostile: true, dropId: 'FRAG-C', route: [[24, 25], [29, 23], [29, 10], [23, 10]] },
+      { id: 'I-08', x: 7, y: 2.8, z: -44, phase: 3.1, hostile: true, route: [[7, -44], [10, -49], [2, -49], [2, -44]] },
       { id: 'M-01', x: 8, y: 1.8, z: 36, phase: 1.9, hostile: false, route: [[8, 36]] },
     ];
+    const foundry: Spec[] = [
+      { id: 'I-11', x: -27, y: 3, z: 30, phase: 0.3, hostile: true, respawnDelay: 7, route: [[-27, 30], [-30, 12], [-21, 15]] },
+      { id: 'I-12', x: -5, y: 3, z: 22, phase: 1, hostile: true, respawnDelay: 8, route: [[-5, 22], [5, 25], [7, 10]] },
+      { id: 'I-13', x: 26, y: 3, z: 21, phase: 1.7, hostile: true, respawnDelay: 6, route: [[26, 21], [29, 11], [22, 9]] },
+      { id: 'I-14', x: 24, y: 3, z: -11, phase: 2.1, hostile: true, respawnDelay: 7, route: [[24, -11], [29, -2], [23, 6]] },
+      { id: 'I-15', x: -26, y: 3, z: -12, phase: 2.8, hostile: true, respawnDelay: 7, route: [[-26, -12], [-28, 1], [-24, 16]] },
+      { id: 'I-16', x: 5, y: 3, z: -17, phase: 3.4, hostile: true, respawnDelay: 8, route: [[5, -17], [8, -24], [4, -34]] },
+      { id: 'I-17', x: -22, y: 3, z: -30, phase: 4.0, hostile: true, respawnDelay: 6, route: [[-22, -30], [-7, -29], [-5, -36]] },
+      { id: 'I-18', x: 21, y: 3, z: -33, phase: 4.7, hostile: true, respawnDelay: 7, route: [[21, -33], [8, -35], [5, -28]] },
+    ];
+    const arena: Spec[] = [
+      { id: 'I-21', x: -26, y: 3, z: -21, phase: 0, hostile: true, respawnDelay: 7.5, route: [[-26, -21], [-20, -5], [-28, 8]] },
+      { id: 'I-22', x: 26, y: 3, z: -21, phase: 1.3, hostile: true, respawnDelay: 8, route: [[26, -21], [20, -5], [29, 8]] },
+      { id: 'I-23', x: -18, y: 3, z: 19, phase: 2.4, hostile: true, respawnDelay: 9, route: [[-18, 19], [-6, 12], [-16, 1]] },
+      { id: 'I-24', x: 18, y: 3, z: 19, phase: 3.8, hostile: true, respawnDelay: 8, route: [[18, 19], [6, 12], [16, 1]] },
+      { id: 'I-25', x: -34, y: 3.2, z: 7, phase: 4.5, hostile: true, initialDelay: 11, respawnDelay: 10, route: [[-34, 7], [-25, 0], [-32, -11]] },
+      { id: 'I-26', x: 34, y: 3.2, z: 7, phase: 5.2, hostile: true, initialDelay: 19, respawnDelay: 10, route: [[34, 7], [25, 0], [32, -11]] },
+      { id: 'I-27', x: 0, y: 3.2, z: -35, phase: 5.9, hostile: true, initialDelay: 27, respawnDelay: 12, route: [[0, -35], [-8, -29], [8, -27]] },
+    ];
+    const specs = this.mission === 0 ? base : this.mission === 1 ? foundry : arena;
 
     for (const spec of specs) {
       const group = new THREE.Group();
@@ -422,7 +534,7 @@ export class RelayNineArena {
       const eye = new THREE.Mesh(new THREE.SphereGeometry(0.29, 16, 10), glow);
       eye.position.z = spec.hostile ? 0.77 : 0.5;
       group.add(eye);
-      const halo = new THREE.Mesh(new THREE.TorusGeometry(1.15, 0.07, 9, 48), glow);
+      const halo = new THREE.Mesh(new THREE.TorusGeometry(1.15, 0.07, 9, 32), spec.dropId ? new THREE.MeshBasicMaterial({ color: 0xe6ff7b }) : glow);
       halo.rotation.x = 0.12;
       group.add(halo);
       const rim = new THREE.Mesh(new THREE.TorusGeometry(0.93, 0.13, 8, 28), darkMetal);
@@ -454,14 +566,15 @@ export class RelayNineArena {
       const meshes: THREE.Object3D[] = [];
       group.traverse((obj) => { if (obj instanceof THREE.Mesh) meshes.push(obj); });
       this.drones.push({ group, meshes, id: spec.id, hostile: spec.hostile, health: 3, maxHealth: 3, phase: spec.phase, spawn: group.position.clone(), active: true, halo,
-        route: spec.route.map(([x, z]) => ({ x, z })), routeIndex: 1, attackClock: 1.4 + spec.phase * 0.65, boss: false });
+        route: spec.route.map(([x, z]) => ({ x, z })), routeIndex: 1, attackClock: 0.7 + spec.phase * 0.24, boss: false,
+        dropId: spec.dropId, respawnDelay: spec.respawnDelay, respawnClock: 0, initialDelay: spec.initialDelay });
     }
-    this.buildBossMech();
+    if (this.mission === 2) this.buildBossMech();
   }
 
   private buildBossMech(): void {
     const group = new THREE.Group();
-    group.position.set(0, 0, -48);
+    group.position.set(0, 0, -12);
     this.scene.add(group);
     const armor = new THREE.MeshStandardMaterial({ color: 0x41425d, map: grungeTexture, metalness: 0.85, roughness: 0.27 });
     const plating = new THREE.MeshStandardMaterial({ color: 0x9f3a52, map: grungeTexture, metalness: 0.83, roughness: 0.33 });
@@ -512,15 +625,16 @@ export class RelayNineArena {
     const meshes: THREE.Object3D[] = [];
     group.traverse((object) => { if (object instanceof THREE.Mesh) meshes.push(object); });
     this.drones.push({ id: 'SENTINEL', group, meshes, hostile: true, health: BOSS_TUNING.health, maxHealth: BOSS_TUNING.health,
-      spawn: group.position.clone(), phase: 0.7, active: false, halo, route: [{ x: 0, z: -48 }, { x: 3.2, z: -48 }, { x: -3.2, z: -48 }], routeIndex: 1,
-      attackClock: 2, boss: true, limbParts: limbs });
+      spawn: group.position.clone(), phase: 0.7, active: true, halo,
+      route: [{ x: 0, z: -12 }, { x: 15, z: -14 }, { x: 12, z: -27 }, { x: -14, z: -26 }, { x: -16, z: -7 }], routeIndex: 1,
+      attackClock: 1.4, boss: true, limbParts: limbs, respawnClock: 0 });
   }
 
   private buildMissionMarkers(): void {
     const evidence = [
-      { id: 'TRACE-A', x: -29, z: 14 },
-      { id: 'TRACE-B', x: 29, z: -15 },
-      { id: 'TRACE-C', x: -11, z: -48 },
+      { id: 'TRACE-A', x: -29, z: 18 },
+      { id: 'TRACE-B', x: 27, z: 6 },
+      { id: 'TRACE-C', x: 0, z: -30 },
     ];
     const purple = new THREE.MeshBasicMaterial({ color: 0xac8aff, toneMapped: false });
     for (const spec of evidence) {
@@ -540,33 +654,17 @@ export class RelayNineArena {
       const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.62, 0), purple);
       crystal.position.y = 2.3;
       group.add(crystal);
-      this.terminals.push({ id: spec.id, group, meshes: [], position: group.position.clone(), active: true, halo });
-    }
-
-    const locks = [
-      { id: 'LOCK-A', x: -30, y: 3.4, z: -18 },
-      { id: 'LOCK-B', x: 30, y: 3.4, z: -18 },
-      { id: 'LOCK-C', x: 0, y: 5.2, z: -27 },
-    ];
-    const red = new THREE.MeshBasicMaterial({ color: 0xff527a, toneMapped: false });
-    for (const spec of locks) {
-      const group = new THREE.Group();
-      group.position.set(spec.x, spec.y, spec.z);
-      this.scene.add(group);
-      const core = new THREE.Mesh(new THREE.OctahedronGeometry(0.95), red);
-      group.add(core);
-      const halo = new THREE.Mesh(new THREE.TorusGeometry(1.38, 0.12, 8, 32), red);
-      group.add(halo);
-      const outer = new THREE.Mesh(new THREE.TorusGeometry(1.75, 0.035, 6, 32), red);
-      outer.rotation.x = Math.PI / 2;
-      group.add(outer);
-      this.securityLocks.push({ id: spec.id, group, meshes: [core, halo, outer], position: group.position.clone(), active: true, halo });
+      const emitter = new THREE.PointLight(0xb796ff, 10, 12, 2);
+      emitter.position.y = 3.1;
+      group.add(emitter);
+      this.terminals.push({ id: spec.id, group, meshes: [], position: group.position.clone(), active: true, halo,
+        capture: { charge: 0, complete: false } });
     }
   }
 
   private buildShutdownConsole(): THREE.Group {
     const group = new THREE.Group();
-    group.position.set(0, 0, -51);
+    group.position.set(0, 0, -47);
     const green = new THREE.MeshBasicMaterial({ color: 0xe6ff7b, toneMapped: false });
     this.scene.add(group);
     this.box(0, 1.2, 0, 1.8, 2.4, 0.9, darkMetal, group);
@@ -587,29 +685,6 @@ export class RelayNineArena {
     this.scene.add(mesh);
     this.solidSurfaces.push(mesh);
     return mesh;
-  }
-
-  /** Three authored visual sectors share geometry for a lightweight browser campaign. */
-  private buildSectorScenery(): void {
-    const signal = new THREE.Group();
-    const violet = new THREE.MeshBasicMaterial({ color: 0x9d72fa, toneMapped: false });
-    // Signal-trace sector: tall neon arches identify the evidence-route corridor.
-    for (const z of [25, -3, -24]) {
-      for (const x of [-40, 40]) this.box(x, 4.1, z, 0.14, 8.2, 0.14, violet, signal);
-      this.box(0, 8.2, z, 80, 0.12, 0.16, violet, signal);
-    }
-    this.scene.add(signal);
-    this.sectorScenery.push(signal);
-
-    const quarantine = new THREE.Group();
-    const red = new THREE.MeshBasicMaterial({ color: 0xff567e, toneMapped: false });
-    // Red containment pylons frame the reactor without introducing collision walls.
-    for (const [x, z] of [[-10, -28], [10, -28], [-10, -49], [10, -49]]) {
-      this.box(x, 3.6, z, 0.24, 7.2, 0.24, red, quarantine);
-      this.box(x, 7.1, z, 0.9, 0.15, 0.9, red, quarantine);
-    }
-    this.scene.add(quarantine);
-    this.sectorScenery.push(quarantine);
   }
 
   private buildWeapon(): void {
@@ -717,32 +792,21 @@ export class RelayNineArena {
       x: drone.group.position.x, z: drone.group.position.z,
       type: drone.boss ? 'boss' as const : drone.hostile ? 'hostile' as const : 'friendly' as const,
     }));
-    const missionBlips = this.mission === 1 ? this.terminals.filter((marker) => marker.active) :
-      this.mission === 2 ? this.securityLocks.some((marker) => marker.active) ? this.securityLocks.filter((marker) => marker.active)
-        : this.drones.some((drone) => drone.boss && drone.active) ? [] : this.shutdownComplete ? [] : [{ position: this.shutdownConsole.position }] : [];
-    return [...hostileBlips, ...missionBlips.map((marker) => ({ x: marker.position.x, z: marker.position.z, type: 'objective' as const }))];
-  }
-
-  private openVaultDoor(): void {
-    this.vaultClosed = false;
-    const index = this.blockers.indexOf(VAULT_DOOR);
-    if (index !== -1) this.blockers.splice(index, 1);
+    const missionBlips = this.mission === 1 ? this.terminals.filter((marker) => marker.active).map((marker) => marker.position)
+      : this.mission === 0 ? [
+        ...this.fragments.filter((fragment) => !fragment.collected).map((fragment) => fragment.position),
+        ...(this.fragments.length === 3 && this.fragments.every((fragment) => fragment.collected) && !this.shutdownComplete ? [this.shutdownConsole.position] : []),
+      ] : [];
+    return [...hostileBlips, ...missionBlips.map((position) => ({ x: position.x, z: position.z, type: 'objective' as const }))];
   }
 
   setMission(mission: number): void {
-    if (![0, 1, 2].includes(mission)) throw new RangeError('Unknown level');
-    this.mission = mission;
-    this.openVaultDoor();
-    this.vaultClosed = mission === 2;
-    if (this.vaultClosed) this.blockers.push(VAULT_DOOR);
-    this.vaultShutter.position.y = this.vaultClosed ? 3.65 : 11;
+    if (mission !== this.mission) throw new RangeError('Each mission requires its own map instance');
+    if (this.vaultShutter) this.vaultShutter.position.y = 11;
     this.shutdownComplete = false;
     this.shutdownConsole.visible = false;
-    if (this.bossBlocker) {
-      const index = this.blockers.indexOf(this.bossBlocker);
-      if (index !== -1) this.blockers.splice(index, 1);
-      this.bossBlocker = null;
-    }
+    for (const fragment of this.fragments) this.scene.remove(fragment.group);
+    this.fragments.length = 0;
     for (const bolt of this.enemyBolts) this.scene.remove(bolt.mesh);
     this.enemyBolts.length = 0;
     const atmospheres = [0x050d17, 0x100d21, 0x220a17];
@@ -752,62 +816,89 @@ export class RelayNineArena {
     this.coreLight.color.setHex([COLOR.cyan, 0xa888ff, 0xff577d][mission]);
     this.coreLight.intensity = 75;
     for (const drone of this.drones) {
-      // Each sector deliberately has its own small set of active signatures.
-      const eligible = drone.id === 'M-01' ||
-        mission === 0 && ['I-01', 'I-02', 'I-03', 'I-04'].includes(drone.id) ||
-        mission === 1 && ['I-01', 'I-02'].includes(drone.id) ||
-        mission === 2 && ['I-03', 'I-04'].includes(drone.id);
       drone.health = drone.boss ? BOSS_TUNING.health : ENEMY_TIERS[mission].health;
       drone.maxHealth = drone.health;
-      drone.active = eligible;
-      drone.group.visible = eligible;
+      drone.active = !drone.initialDelay;
+      drone.group.visible = drone.active;
       drone.group.position.copy(drone.spawn);
       drone.routeIndex = 1;
-      drone.attackClock = drone.boss ? 1.8 : 1.5 + drone.phase * 0.7;
+      drone.attackClock = drone.boss ? 1.4 : 0.7 + drone.phase * 0.24;
+      drone.respawnClock = drone.initialDelay ?? 0;
     }
     for (const marker of this.terminals) {
       marker.active = true;
-      marker.group.visible = mission === 1;
+      marker.capture = { charge: 0, complete: false };
+      marker.group.visible = true;
     }
-    for (const marker of this.securityLocks) {
-      marker.active = true;
-      marker.group.visible = mission === 2;
-    }
-    this.sectorScenery.forEach((group, index) => { group.visible = mission === index + 1; });
   }
 
-  /** An operator must physically approach an evidence beacon to collect it. */
+  private spawnFragment(id: string, position: THREE.Vector3): void {
+    const group = new THREE.Group();
+    group.position.set(position.x, 0, position.z);
+    const lime = new THREE.MeshBasicMaterial({ color: 0xe6ff7b, toneMapped: false });
+    const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.63), lime);
+    crystal.position.y = 1.05;
+    group.add(crystal);
+    const base = new THREE.Mesh(new THREE.TorusGeometry(1.18, 0.11, 7, 32), lime);
+    base.position.y = 0.15;
+    base.rotation.x = Math.PI / 2;
+    group.add(base);
+    const beacon = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 3.7, 9),
+      new THREE.MeshBasicMaterial({ color: 0xbaff6b, transparent: true, opacity: 0.27, depthWrite: false }));
+    beacon.position.y = 1.85;
+    group.add(beacon);
+    this.scene.add(group);
+    this.fragments.push({ id, group, position: group.position.clone(), collected: false });
+  }
+
+  /** Proximity pickups are mission-one only; towers charge automatically. */
   scanNearby(x: number, z: number): string | null {
-    if (this.mission === 2 && !this.shutdownComplete && this.drones.some((drone) => drone.boss && !drone.active && drone.health <= 0)
-      && Math.hypot(this.shutdownConsole.position.x - x, this.shutdownConsole.position.z - z) <= 3.5) {
+    if (this.mission !== 0) return null;
+    const fragment = this.fragments.find((piece) => !piece.collected && Math.hypot(piece.position.x - x, piece.position.z - z) <= 3.4);
+    if (fragment) {
+      fragment.collected = true;
+      fragment.group.visible = false;
+      this.spawnImpact(fragment.position.clone().add(new THREE.Vector3(0, 1, 0)), 0xe6ff7b, 0.9);
+      if (this.fragments.length === 3 && this.fragments.every((piece) => piece.collected)) this.shutdownConsole.visible = true;
+      return fragment.id;
+    }
+    if (!this.shutdownComplete && this.shutdownConsole.visible && Math.hypot(this.shutdownConsole.position.x - x, this.shutdownConsole.position.z - z) <= 3.5) {
       this.shutdownComplete = true;
       this.shutdownConsole.visible = false;
       this.spawnImpact(this.shutdownConsole.position.clone().add(new THREE.Vector3(0, 2, 0)), 0xe6ff7b, 1.2);
-      return 'SHUTDOWN';
+      return 'UPLOAD';
     }
+    return null;
+  }
+
+  updateCapture(x: number, z: number, delta: number): { id: string; percent: number; completed: boolean; inRange: boolean } | null {
     if (this.mission !== 1) return null;
-    const nearby = this.terminals.find((marker) =>
-      marker.active && Math.hypot(marker.position.x - x, marker.position.z - z) <= 3.1,
-    );
-    if (!nearby) return null;
-    nearby.active = false;
-    nearby.group.visible = false;
-    this.spawnImpact(nearby.position.clone().add(new THREE.Vector3(0, 2, 0)), 0xad8fff, 0.75);
-    return nearby.id;
+    const nearest = this.terminals.filter((marker) => marker.active).map((marker) => ({ marker,
+      distance: Math.hypot(marker.position.x - x, marker.position.z - z) })).sort((a, b) => a.distance - b.distance)[0];
+    if (!nearest) return null;
+    const wasComplete = nearest.marker.capture.complete;
+    nearest.marker.capture = advanceCapture(nearest.marker.capture, nearest.distance, delta);
+    if (!wasComplete && nearest.marker.capture.complete) {
+      nearest.marker.active = false;
+      nearest.marker.group.visible = false;
+      this.spawnImpact(nearest.marker.position.clone().add(new THREE.Vector3(0, 3, 0)), 0xad8fff, 2);
+    }
+    return { id: nearest.marker.id, percent: Math.round(nearest.marker.capture.charge * 100),
+      completed: !wasComplete && nearest.marker.capture.complete, inRange: nearest.distance <= CAPTURE_RADIUS };
   }
 
   getWaypoint(x: number, z: number): { id: string; distance: number; dx: number; dz: number } | null {
-    const candidates = this.mission === 0
-      ? this.drones.filter((drone) => drone.hostile && drone.active)
-      : this.mission === 1
-        ? this.terminals.filter((marker) => marker.active)
-        : this.securityLocks.some((marker) => marker.active)
-          ? this.securityLocks.filter((marker) => marker.active)
-          : this.drones.some((drone) => drone.boss && drone.active)
-            ? this.drones.filter((drone) => drone.boss && drone.active)
-            : this.shutdownComplete ? [] : [{ id: 'SHUTDOWN', position: this.shutdownConsole.position }];
+    const candidates: { id: string; position: THREE.Vector3 }[] = this.mission === 0
+      ? this.fragments.length === 3 && this.fragments.every((fragment) => fragment.collected)
+        ? this.shutdownComplete ? [] : [{ id: 'UPLOAD', position: this.shutdownConsole.position }]
+        : [
+          ...this.fragments.filter((fragment) => !fragment.collected).map((fragment) => ({ id: fragment.id, position: fragment.position })),
+          ...this.drones.filter((drone) => drone.active && !!drone.dropId).map((drone) => ({ id: `CARRIER ${drone.dropId}`, position: drone.group.position })),
+        ]
+      : this.mission === 1 ? this.terminals.filter((marker) => marker.active).map((marker) => ({ id: marker.id, position: marker.position }))
+        : this.drones.filter((drone) => drone.boss && drone.active).map((drone) => ({ id: drone.id, position: drone.group.position }));
     const closest = candidates.map((marker) => {
-      const position = 'spawn' in marker ? marker.group.position : marker.position;
+      const position = marker.position;
       const dx = position.x - x;
       const dz = position.z - z;
       return { id: marker.id, distance: Math.hypot(dx, dz), dx, dz };
@@ -826,6 +917,16 @@ export class RelayNineArena {
     this.setMission(this.mission);
   }
 
+  /** Release level-owned GPU meshes when transitioning maps or retrying a checkpoint. */
+  dispose(): void {
+    const geometries = new Set<THREE.BufferGeometry>();
+    this.scene.traverse((object) => {
+      if (object instanceof THREE.Mesh || object instanceof THREE.Points || object instanceof THREE.LineSegments) geometries.add(object.geometry);
+    });
+    for (const geometry of geometries) geometry.dispose();
+    this.boltGeometry.dispose();
+  }
+
   fire(): ShotResult {
     this.weaponKick = 1;
     this.muzzleTime = 0.065;
@@ -835,30 +936,12 @@ export class RelayNineArena {
     this.raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera);
     this.raycaster.far = 90;
     const hittable = this.drones.filter((drone) => drone.active).flatMap((drone) => drone.meshes);
-    const locks = this.mission === 2 ? this.securityLocks.filter((marker) => marker.active).flatMap((marker) => marker.meshes) : [];
-    const hits = this.raycaster.intersectObjects([...hittable, ...locks, ...this.solidSurfaces], false);
+    const hits = this.raycaster.intersectObjects([...hittable, ...this.solidSurfaces], false);
     const hit = hits[0];
     if (!hit) {
       return { kind: 'miss', destroyed: false, point: this.camera.position.clone().add(this.camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(50)) };
     }
 
-    const securityLock = this.securityLocks.find((item) => this.mission === 2 && item.active && item.meshes.includes(hit.object));
-    if (securityLock) {
-      securityLock.active = false;
-      securityLock.group.visible = false;
-      this.spawnImpact(hit.point, COLOR.magenta, 1);
-      if (this.securityLocks.every((marker) => !marker.active)) {
-        this.openVaultDoor();
-        const sentinel = this.drones.find((drone) => drone.id === 'SENTINEL');
-        if (sentinel) {
-          sentinel.active = true;
-          sentinel.group.visible = true;
-          this.bossBlocker = { x: sentinel.spawn.x, z: sentinel.spawn.z, halfWidth: 2.2, halfDepth: 1.8 };
-          this.blockers.push(this.bossBlocker);
-        }
-      }
-      return { kind: 'objective', destroyed: true, point: hit.point, targetId: securityLock.id };
-    }
     const drone = this.drones.find((item) => item.active && item.meshes.includes(hit.object));
     if (!drone) {
       this.spawnImpact(hit.point, COLOR.cyanDeep, 0.22);
@@ -872,14 +955,9 @@ export class RelayNineArena {
     if (destroyed) {
       drone.active = false;
       drone.group.visible = false;
-      if (drone.boss) {
-        if (this.bossBlocker) {
-          const index = this.blockers.indexOf(this.bossBlocker);
-          if (index !== -1) this.blockers.splice(index, 1);
-          this.bossBlocker = null;
-        }
-        this.shutdownConsole.visible = true;
-      }
+      if (drone.dropId) this.spawnFragment(drone.dropId, drone.group.position.clone());
+      if (drone.respawnDelay && (this.mission === 1 || this.sentinelHealth > 0))
+        drone.respawnClock = drone.respawnDelay ?? 0;
       this.spawnImpact(drone.group.position.clone().add(new THREE.Vector3(0, drone.boss ? 4 : 0, 0)), COLOR.magenta, drone.boss ? 3.4 : 1.6);
     }
     return { kind: 'hostile', destroyed, point: hit.point, targetId: drone.id };
@@ -911,17 +989,30 @@ export class RelayNineArena {
     let damage = 0;
     this.coreLight.intensity += (68 + Math.sin(time * 1.7) * 9 - this.coreLight.intensity) * Math.min(delta * 2, 1);
     for (const { ring, speed } of this.animatedRings) ring.rotation.z += delta * speed;
-    const vaultDestination = this.vaultClosed ? 3.65 : 11;
-    this.vaultShutter.position.y += (vaultDestination - this.vaultShutter.position.y) * Math.min(delta * 4.3, 1);
+    if (this.vaultShutter) this.vaultShutter.position.y += (11 - this.vaultShutter.position.y) * Math.min(delta * 4.3, 1);
 
-    for (const marker of [...this.terminals, ...this.securityLocks]) {
+    for (const marker of this.terminals) {
       if (!marker.active) continue;
-      marker.halo.rotation.z += delta * (this.mission === 2 ? 0.75 : 0.22);
+      marker.halo.rotation.z += delta * 0.55;
       marker.halo.scale.setScalar(1 + Math.sin(time * 2.4 + marker.position.x) * 0.08);
     }
 
     for (const drone of this.drones) {
-      if (!drone.active) continue;
+      if (!drone.active) {
+        if (player && drone.respawnClock > 0 && (this.mission !== 2 || this.sentinelHealth > 0)) {
+          drone.respawnClock -= delta;
+          if (drone.respawnClock <= 0) {
+            drone.active = true;
+            drone.group.visible = true;
+            drone.health = drone.maxHealth;
+            drone.group.position.copy(drone.spawn);
+            drone.routeIndex = 1;
+            drone.attackClock = 1.15;
+            this.spawnImpact(drone.spawn, COLOR.magenta, 1.3);
+          }
+        }
+        continue;
+      }
       if (player && drone.hostile) {
         const destination = drone.route[drone.routeIndex] ?? drone.route[0];
         const dx = destination.x - drone.group.position.x;
@@ -933,8 +1024,7 @@ export class RelayNineArena {
           const step = Math.min(distance, speed * delta);
           const x = drone.group.position.x + dx / distance * step;
           const z = drone.group.position.z + dz / distance * step;
-          const walls = this.bossBlocker ? this.blockers.filter((blocker) => blocker !== this.bossBlocker) : this.blockers;
-          if (!pointBlocked(x, z, walls, drone.boss ? 2.2 : 0.75)) {
+          if (!pointBlocked(x, z, this.blockers, drone.boss ? 2.2 : 0.75)) {
             drone.group.position.x = x;
             drone.group.position.z = z;
           } else drone.routeIndex = (drone.routeIndex + 1) % drone.route.length;
@@ -945,8 +1035,7 @@ export class RelayNineArena {
         const range = drone.boss ? BOSS_TUNING.range : ENEMY_TIERS[this.mission].range;
         const enemyY = drone.boss ? 4.5 : drone.group.position.y;
         const distant = Math.hypot(player.x - drone.group.position.x, player.z - drone.group.position.z) > range;
-        const opaqueWalls = this.bossBlocker ? this.blockers.filter((blocker) => blocker !== this.bossBlocker) : this.blockers;
-        const covered = segmentBlocked(drone.group.position.x, drone.group.position.z, player.x, player.z, opaqueWalls, 0.25);
+        const covered = segmentBlocked(drone.group.position.x, drone.group.position.z, player.x, player.z, this.blockers, 0.25);
         if (drone.attackClock <= 0 && !distant && !covered && Math.abs(player.y - enemyY) < 7) {
           this.fireEnemyBolt(drone, player);
           drone.attackClock = drone.boss ? BOSS_TUNING.fireInterval : ENEMY_TIERS[this.mission].fireInterval;
@@ -964,8 +1053,7 @@ export class RelayNineArena {
       for (let i = this.enemyBolts.length - 1; i >= 0; i -= 1) {
         const bolt = this.enemyBolts[i];
         bolt.life -= delta;
-        const step = advanceBolt(bolt.mesh.position, bolt.velocity, delta, player,
-          this.bossBlocker ? this.blockers.filter((blocker) => blocker !== this.bossBlocker) : this.blockers);
+        const step = advanceBolt(bolt.mesh.position, bolt.velocity, delta, player, this.blockers);
         bolt.mesh.position.set(step.position.x, step.position.y, step.position.z);
         if (step.result === 'hit') damage += bolt.damage;
         if (bolt.life <= 0 || step.result !== 'flying') {

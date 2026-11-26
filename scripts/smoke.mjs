@@ -41,11 +41,13 @@ try {
 
   const ammo = await page.locator('#ammoValue').textContent();
   assert.equal(ammo, '30', 'Weapon HUD should initialize with a full magazine');
-  assert.ok((await page.locator('#objectiveTitle').textContent())?.includes('Identify and contain'));
+  assert.ok((await page.locator('#objectiveTitle').textContent())?.includes('Recover three network fragments'));
   assert.equal(await page.locator('#objectiveCount').textContent(), '0 / 4');
   assert.equal(await page.locator('#healthValue').textContent(), '100 / 100');
   assert.equal(await page.locator('#minimapPanel').isVisible(), true);
   assert.equal(await page.locator('#menuOverlay').isVisible(), false);
+  assert.equal(await page.locator('#bossPanel').isVisible(), false, 'Boss HUD is only shown in mission 3');
+  assert.equal(await page.locator('#capturePanel').isVisible(), false, 'Capture HUD is only shown in mission 2');
   assert.equal(errors.length, 0, `Browser errors: ${errors.join('; ')}`);
   process.stdout.write('Smoke test passed: campaign menu, updated manual, tactical minimap, health and first mission HUD.\n');
 } finally {

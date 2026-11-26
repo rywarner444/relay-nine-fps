@@ -1,4 +1,4 @@
-/** Pure mission progression. All intelligence and threats here are fictional, scripted gameplay. */
+/** Pure checkpoint-safe mission progression; all threats and evidence are fictional. */
 
 export interface MissionDefinition {
   number: string;
@@ -10,38 +10,34 @@ export interface MissionDefinition {
 
 export const MISSIONS: readonly MissionDefinition[] = [
   {
-    number: '01', name: 'PERIMETER BREACH', codename: 'IDENTIFY / CONTAIN',
-    briefing: 'Breach the southern checkpoint. Fight through the corridors and destroy four magenta threats. The amber maintenance drone is friendly.',
-    lesson: 'Threat classification: precision matters more than firing blindly.',
+    number: '01', name: 'BASE FLOOR', codename: 'RETRIEVE / RESTORE',
+    briefing: 'Clear hostile patrols. Three marked rogues carry network fragments: eliminate them, collect their drops with E, then insert all three into the base-floor computer.',
+    lesson: 'Threat response: collect verified artifacts before restoring a service.',
   },
   {
-    number: '02', name: 'SIGNAL TRACE', codename: 'INVESTIGATE / VERIFY',
-    briefing: 'Navigate the east and west wings and reach three violet signal terminals. Press E to extract evidence while hostile patrols guard the halls.',
-    lesson: 'Investigation: retrieve evidence before taking action.',
+    number: '02', name: 'SIGNAL FOUNDRY', codename: 'HOLD / CAPTURE',
+    briefing: 'Secure three uplink towers across the foundry. Stand inside each violet capture ring until it reaches 100%. Fight off incoming drone patrols while you hold the zone.',
+    lesson: 'Resilience engineering: maintain control of infrastructure under pressure.',
   },
   {
-    number: '03', name: 'GHOST PROTOCOL', codename: 'DISRUPT / RECOVER',
-    briefing: 'Disable three red security locks, breach the north vault, defeat the massive sentinel mech, then press E at the mainframe to shut it down.',
-    lesson: 'Incident response: disable defenses, isolate the threat, restore control.',
+    number: '03', name: 'SENTINEL ARENA', codename: 'SURVIVE / DEFEAT',
+    briefing: 'One final objective: defeat the giant mobile sentinel. It has heavy armor, powerful missiles, and summons reinforcement drones. Keep moving and use the arena cover.',
+    lesson: 'Adversarial systems: manage a high-priority threat while handling reinforcements.',
   },
 ];
 
-export interface CampaignState {
-  mission: number;
-  completed: string[];
-}
+export interface CampaignState { mission: number; completed: string[]; }
 
 export type MissionEvent =
-  | { type: 'elimination'; id: string }
-  | { type: 'evidence'; id: string }
-  | { type: 'lock'; id: string }
-  | { type: 'sentinel'; id: string }
-  | { type: 'shutdown'; id: string };
+  | { type: 'fragment'; id: string }
+  | { type: 'upload'; id: 'UPLOAD' }
+  | { type: 'charged'; id: string }
+  | { type: 'boss'; id: 'SENTINEL' };
 
-const missionTargets: readonly (readonly string[])[] = [
-  ['I-01', 'I-02', 'I-03', 'I-04'],
+const REQUIRED: readonly (readonly string[])[] = [
+  ['FRAG-A', 'FRAG-B', 'FRAG-C', 'UPLOAD'],
   ['TRACE-A', 'TRACE-B', 'TRACE-C'],
-  ['LOCK-A', 'LOCK-B', 'LOCK-C', 'SENTINEL', 'SHUTDOWN'],
+  ['SENTINEL'],
 ];
 
 export function startMission(mission: number): CampaignState {
@@ -50,32 +46,39 @@ export function startMission(mission: number): CampaignState {
 }
 
 export function recordMissionEvent(previous: CampaignState, event: MissionEvent): CampaignState {
-  const matchingType = ['elimination', 'evidence', 'lock', 'sentinel'][previous.mission];
-  const targetIds = missionTargets[previous.mission];
-  const allowed = event.type === matchingType || (previous.mission === 2 && ['sentinel', 'shutdown'].includes(event.type));
-  if (!allowed || !targetIds.includes(event.id) || previous.completed.includes(event.id)) return previous;
-  // Sentinel must be unlocked after all three security locks are disabled.
-  if (event.type === 'sentinel' && !['LOCK-A', 'LOCK-B', 'LOCK-C'].every((id) => previous.completed.includes(id))) return previous;
-  if (event.type === 'shutdown' && !previous.completed.includes('SENTINEL')) return previous;
+  const allowedTypes = previous.mission === 0 ? ['fragment', 'upload'] : previous.mission === 1 ? ['charged'] : ['boss'];
+  if (!allowedTypes.includes(event.type) || !REQUIRED[previous.mission].includes(event.id) || previous.completed.includes(event.id)) return previous;
+  if (event.type === 'upload' && !['FRAG-A', 'FRAG-B', 'FRAG-C'].every((id) => previous.completed.includes(id))) return previous;
   return { ...previous, completed: [...previous.completed, event.id] };
 }
 
 export function missionProgress(state: CampaignState): { current: number; total: number; complete: boolean; label: string; title: string; hint: string } {
-  const total = missionTargets[state.mission].length;
+  const total = REQUIRED[state.mission].length;
   const current = state.completed.length;
-  if (state.mission === 0) return {
-    current, total, complete: current === total, label: 'HOSTILES CONTAINED',
-    title: 'Identify and contain', hint: 'Shoot 4 magenta drones. Do not shoot the amber maintenance unit.',
-  };
+  if (state.mission === 0) {
+    const collected = ['FRAG-A', 'FRAG-B', 'FRAG-C'].every((id) => state.completed.includes(id));
+    return {
+      current, total, complete: current === total, label: 'NETWORK RECOVERY',
+      title: collected ? 'Insert the fragments' : 'Recover three network fragments',
+      hint: collected ? 'Follow the green computer marker and press E to insert the fragments.'
+        : 'Eliminate marked magenta carrier drones. Collect the luminous green drops with E.',
+    };
+  }
   if (state.mission === 1) return {
-    current, total, complete: current === total, label: 'EVIDENCE RECOVERED',
-    title: 'Trace the signal', hint: 'Find the tall violet beacons. Move close and press E to scan.',
+    current, total, complete: current === total, label: 'UPLINKS SECURED',
+    title: 'Hold the signal towers',
+    hint: 'Stand inside a purple capture radius until the charge reaches 100%. Defend yourself!',
   };
-  const unlocked = ['LOCK-A', 'LOCK-B', 'LOCK-C'].every((id) => state.completed.includes(id));
-  const bossDefeated = state.completed.includes('SENTINEL');
   return {
-    current, total, complete: current === total, label: 'NETWORK RECOVERY',
-    title: bossDefeated ? 'Shut down the rogue mainframe' : unlocked ? 'Eliminate the AI sentinel' : 'Break the AI security locks',
-    hint: bossDefeated ? 'Reach the glowing green shutdown console in the north vault and press E.' : unlocked ? 'Enter the vault. Use cover and fire at the massive crimson mech.' : 'Fight through the halls and shoot all 3 red security locks.',
+    current, total, complete: current === total, label: 'FINAL ENCOUNTER',
+    title: 'Defeat the Sentinel',
+    hint: 'Damage the moving mech while dodging missiles and reinforcement drones.',
   };
+}
+
+export const CHECKPOINT_KEY = 'relay-nine-unlocked-level';
+
+export function safeCheckpoint(value: unknown): number {
+  const number = Number(value);
+  return Number.isInteger(number) && number >= 0 && number < MISSIONS.length ? number : 0;
 }

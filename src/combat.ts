@@ -13,13 +13,13 @@ export interface EnemyTuning {
 }
 
 export const ENEMY_TIERS: readonly EnemyTuning[] = [
-  { health: 2, speed: 1.8, fireInterval: 3.4, projectileSpeed: 11, damage: 7, range: 21 },
-  { health: 3, speed: 2.3, fireInterval: 2.65, projectileSpeed: 13, damage: 9, range: 24 },
-  { health: 4, speed: 2.8, fireInterval: 2.1, projectileSpeed: 16, damage: 11, range: 28 },
+  { health: 2, speed: 2.15, fireInterval: 2.1, projectileSpeed: 13, damage: 6, range: 29 },
+  { health: 3, speed: 2.7, fireInterval: 1.8, projectileSpeed: 15, damage: 7, range: 36 },
+  { health: 3, speed: 3.15, fireInterval: 1.65, projectileSpeed: 17, damage: 7, range: 40 },
 ];
 
 export const BOSS_TUNING: EnemyTuning = {
-  health: 42, speed: 1.3, fireInterval: 1.5, projectileSpeed: 18, damage: 14, range: 30,
+  health: 110, speed: 2.7, fireInterval: 1.05, projectileSpeed: 18, damage: 12, range: 50,
 };
 
 export function pointBlocked(x: number, z: number, blocks: readonly Blocker[], radius = 0.7): boolean {

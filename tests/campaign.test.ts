@@ -1,43 +1,54 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MISSIONS, missionProgress, recordMissionEvent, startMission } from '../src/campaign.ts';
+import { CHECKPOINT_KEY, MISSIONS, missionProgress, recordMissionEvent, safeCheckpoint, startMission } from '../src/campaign.ts';
 
-test('three missions teach containment, evidence collection, and rogue AI recovery', () => {
+test('three unique assignments are clearly documented', () => {
   assert.equal(MISSIONS.length, 3);
-  assert.deepEqual(MISSIONS.map((m) => m.number), ['01', '02', '03']);
-  assert.ok(MISSIONS.every((m) => m.briefing.length > 20 && m.lesson.length > 20));
+  assert.deepEqual(MISSIONS.map((mission) => mission.number), ['01', '02', '03']);
+  assert.match(MISSIONS[0].briefing, /fragments/i);
+  assert.match(MISSIONS[1].briefing, /radius|ring/i);
+  assert.match(MISSIONS[2].briefing, /sentinel|mech/i);
+  assert.ok(MISSIONS.every((mission) => mission.lesson.length > 25));
 });
 
-test('mission 1 requires four distinct hostile eliminations, not false positives', () => {
+test('base floor requires three distinct pickups before computer insertion', () => {
   let state = startMission(0);
   assert.equal(missionProgress(state).total, 4);
-  state = recordMissionEvent(state, { type: 'elimination', id: 'I-01' });
-  state = recordMissionEvent(state, { type: 'elimination', id: 'I-01' });
-  state = recordMissionEvent(state, { type: 'elimination', id: 'M-01' });
+  state = recordMissionEvent(state, { type: 'upload', id: 'UPLOAD' });
+  assert.equal(missionProgress(state).current, 0, 'Cannot insert before collecting');
+  state = recordMissionEvent(state, { type: 'fragment', id: 'FRAG-A' });
+  state = recordMissionEvent(state, { type: 'fragment', id: 'FRAG-A' });
+  state = recordMissionEvent(state, { type: 'fragment', id: 'BOGUS' });
   assert.equal(missionProgress(state).current, 1);
-  for (const id of ['I-02', 'I-03', 'I-04']) state = recordMissionEvent(state, { type: 'elimination', id });
-  assert.equal(missionProgress(state).complete, true);
-});
-
-test('mission 2 is evidence-first and does not require combat', () => {
-  let state = startMission(1);
-  state = recordMissionEvent(state, { type: 'elimination', id: 'I-01' });
-  assert.equal(missionProgress(state).current, 0);
-  for (const id of ['TRACE-A', 'TRACE-B', 'TRACE-C']) state = recordMissionEvent(state, { type: 'evidence', id });
-  assert.equal(missionProgress(state).complete, true);
-});
-
-test('mission 3 requires all three locks before sentinel defeat counts', () => {
-  let state = startMission(2);
-  const premature = recordMissionEvent(state, { type: 'sentinel', id: 'SENTINEL' });
-  assert.equal(premature, state);
-  for (const id of ['LOCK-A', 'LOCK-B', 'LOCK-C']) state = recordMissionEvent(state, { type: 'lock', id });
-  assert.match(missionProgress(state).title, /sentinel/i);
+  for (const id of ['FRAG-B', 'FRAG-C']) state = recordMissionEvent(state, { type: 'fragment', id });
+  assert.match(missionProgress(state).title, /insert/i);
   assert.equal(missionProgress(state).complete, false);
-  state = recordMissionEvent(state, { type: 'sentinel', id: 'SENTINEL' });
-  assert.equal(missionProgress(state).complete, false, 'Network still requires a manual shutdown');
-  assert.match(missionProgress(state).title, /shut down/i);
-  state = recordMissionEvent(state, { type: 'shutdown', id: 'SHUTDOWN' });
+  state = recordMissionEvent(state, { type: 'upload', id: 'UPLOAD' });
+  assert.equal(missionProgress(state).complete, true);
+});
+
+test('foundry only counts charged uplinks; shooting guards cannot skip zones', () => {
+  let state = startMission(1);
+  state = recordMissionEvent(state, { type: 'fragment', id: 'FRAG-A' });
+  assert.equal(missionProgress(state).current, 0);
+  for (const id of ['TRACE-A', 'TRACE-B', 'TRACE-C']) state = recordMissionEvent(state, { type: 'charged', id });
+  assert.equal(missionProgress(state).complete, true);
+});
+
+test('boss defeat is final mission only objective', () => {
+  let state = startMission(2);
+  assert.equal(missionProgress(state).total, 1);
+  state = recordMissionEvent(state, { type: 'boss', id: 'SENTINEL' });
   assert.equal(missionProgress(state).complete, true);
   assert.throws(() => startMission(3), RangeError);
+});
+
+test('local browser checkpoint values are bounded to unlocked mission numbers', () => {
+  assert.equal(CHECKPOINT_KEY, 'relay-nine-unlocked-level');
+  assert.equal(safeCheckpoint(null), 0);
+  assert.equal(safeCheckpoint('1'), 1);
+  assert.equal(safeCheckpoint('2'), 2);
+  assert.equal(safeCheckpoint('3'), 0);
+  assert.equal(safeCheckpoint(-7), 0);
+  assert.equal(safeCheckpoint('foo'), 0);
 });

@@ -32,7 +32,17 @@
         <p id="objectiveText">Shoot the magenta drones. Protect the friendly maintenance unit.</p>
         <div class="objective-progress"><span id="objectiveFill"></span></div>
         <div class="objective-progress-caption"><span id="objectiveCaption">HOSTILES CONTAINED</span><strong id="objectiveCount">0 / 4</strong></div>
-        <div class="boss-health" id="bossHealth"></div>
+      </section>
+
+      <section class="capture-panel" id="capturePanel" aria-label="Tower capture progress" hidden>
+        <div class="capture-top"><span>UPLINK CAPTURE / <strong id="captureName">TRACE-A</strong></span><span id="captureText">MOVE INSIDE RING</span></div>
+        <div class="capture-track"><span id="captureFill"></span></div>
+      </section>
+
+      <section class="boss-panel" id="bossPanel" aria-label="Sentinel boss health" hidden>
+        <div class="boss-top"><span class="boss-alert">◆ FINAL THREAT</span><strong>SENTINEL // AEGIS-9</strong><span id="bossHpText">110 / 110 ARMOR</span></div>
+        <div class="boss-track"><span id="bossFill"></span></div>
+        <div class="boss-subline"><span>HEAVY ARMOR / MOBILE PLATFORM</span><span>INCOMING DRONE REINFORCEMENTS</span></div>
       </section>
 
       <section class="telemetry-panel hud-panel" id="telemetryPanel" aria-label="Simulation telemetry" hidden>
@@ -71,7 +81,7 @@
       <section class="menu-overlay" id="menuOverlay" aria-label="Game menu">
         <div class="menu-backdrop"></div>
         <div class="menu-shell">
-          <div class="menu-header"><div class="menu-overline"><span class="menu-monogram">R<span>9</span></span><span>RELAY NINE <small>THE SIGNAL CAMPAIGN</small></span></div><span class="classification">BUILD 0.4 / PRIVATE DEVELOPMENT</span></div>
+          <div class="menu-header"><div class="menu-overline"><span class="menu-monogram">R<span>9</span></span><span>RELAY NINE <small>THE SIGNAL CAMPAIGN</small></span></div><span class="classification">BUILD 0.5 / PRIVATE DEVELOPMENT</span></div>
           <div class="menu-main">
             <div class="menu-title-area">
               <div class="sector-kicker"><span class="live-dot"></span> 3-MISSION MICRO CAMPAIGN <span class="number-stamp" id="menuMissionNumber">[ MISSION 01 / 03 ]</span></div>
@@ -79,6 +89,7 @@
               <p id="menuDescription">Fight through an expanded cyberpunk facility. Use cover, navigate its hallways and stop the rogue AI before it takes control.</p>
               <div class="menu-actions"><button class="primary-button" id="deployButton" type="button"><span>▶</span> START OPERATION</button><button class="secondary-button" id="tutorialButton" type="button">FIELD MANUAL <span aria-hidden="true">↗</span></button><button class="secondary-button" id="restartButton" type="button" hidden>↻ RESTART CAMPAIGN</button></div>
               <div class="debrief" id="debrief" hidden><div class="eyebrow">MISSION DEBRIEF // LOCAL RESULTS</div><strong id="debriefRank">A // MISSION COMPLETE</strong><span id="debriefStats">SCORE 0000</span></div>
+              <div class="achievement-panel" id="achievementPanel" hidden><div class="achievement-icon">✦</div><div><span class="eyebrow">ACHIEVEMENT UNLOCKED / CAMPAIGN COMPLETE</span><strong>GHOST PROTOCOL</strong><p>All three operations cleared. You defeated Aegis-9 and secured Relay Nine.</p></div></div>
               <div class="menu-footnote"><span class="tiny-diamond">◆</span> SOLO DEPLOYMENT <span class="sep">—</span> MOUSE + KEYBOARD <span class="sep">—</span> OFFLINE FICTIONAL SIMULATION</div>
             </div>
             <div class="mission-card">
@@ -97,10 +108,12 @@
       <dialog id="manualDialog" class="manual-dialog" aria-label="Field manual">
         <div class="manual-inner">
           <div class="manual-head"><div><span class="eyebrow">R9 / OPERATOR HANDBOOK</span><h2>FIELD MANUAL</h2></div><button id="closeManual" class="close-button" type="button" aria-label="Close field manual">✕</button></div>
-          <p><strong>What to do:</strong> 01 Fight through the corridors and destroy four magenta hostile drones (leave the amber friendly alone). 02 Navigate both side wings and the north vault; press <kbd>E</kbd> near three violet evidence beacons. 03 Shoot three red security locks, enter the vault, defeat the giant mech, and press <kbd>E</kbd> at the green shutdown console.</p>
-          <p><strong>Watch out:</strong> Drones patrol and shoot red energy bolts. Your health bar is below the minimap; move, slide and hide behind crates. Health resets at the start of each mission. Red dots on the minimap are enemies, gold is friendly, and purple markers are objectives.</p>
-          <div class="manual-grid"><div><kbd>W A S D</kbd><span>Move</span></div><div><kbd>MOUSE</kbd><span>Look / aim</span></div><div><kbd>LEFT CLICK</kbd><span>Fire weapon</span></div><div><kbd>SHIFT</kbd><span>Sprint</span></div><div><kbd>SPACE</kbd><span>Jump</span></div><div><kbd>C / CTRL</kbd><span>Slide while moving</span></div><div><kbd>E</kbd><span>Scan / shut down</span></div><div><kbd>R</kbd><span>Reload</span></div><div><kbd>TAB</kbd><span>Engineering view</span></div><div><kbd>ESC</kbd><span>Pause / settings</span></div></div>
-          <p class="manual-note">Graphics and sensitivity can be changed from the pause menu. Audio stays muted until enabled. The game is entirely fictional and runs locally.</p>
+          <p><strong>01 / BASE FLOOR:</strong> Eliminate the three magenta drones marked as <strong>carriers</strong>. Each drops a glowing green network fragment. Walk up and press <kbd>E</kbd> to collect each one. When you have all three, follow the waypoint to the green computer and press <kbd>E</kbd> to upload.</p>
+          <p><strong>02 / SIGNAL FOUNDRY:</strong> Find the three purple uplink towers on this <strong>new map</strong>. Step inside a tower's bright purple floor ring and <strong>stay there until it charges to 100%</strong>. You can shoot and move within the ring while defending yourself. No E press needed.</p>
+          <p><strong>03 / SENTINEL ARENA:</strong> Defeat the giant moving mech. Watch its large red health bar at the top of the screen. It has heavy armor and calls in new drones. Destroying the boss is the <strong>only objective</strong> and unlocks the final achievement.</p>
+          <p><strong>Survival:</strong> Hostiles move and fire energy missiles. Sprint, slide and use cover; your health resets at each level start. If you die, <strong>retry that level</strong>—completed levels remain unlocked in this browser. Radar: red = enemy, gold = friendly, purple/green = objective.</p>
+          <div class="manual-grid"><div><kbd>W A S D</kbd><span>Move</span></div><div><kbd>MOUSE</kbd><span>Look / aim</span></div><div><kbd>LEFT CLICK</kbd><span>Fire weapon</span></div><div><kbd>SHIFT</kbd><span>Sprint</span></div><div><kbd>SPACE</kbd><span>Jump</span></div><div><kbd>C / CTRL</kbd><span>Slide while moving</span></div><div><kbd>E</kbd><span>Pick up / insert (level 01)</span></div><div><kbd>R</kbd><span>Reload</span></div><div><kbd>TAB</kbd><span>Engineering view</span></div><div><kbd>ESC</kbd><span>Pause / settings</span></div></div>
+          <p class="manual-note">Graphics and sensitivity can be changed from the pause menu. Audio stays muted until enabled. Progress is stored locally in your browser; there are no accounts, APIs, or real security operations.</p>
           <button id="manualDeploy" class="primary-button" type="button">▶ ENTER MISSION</button>
         </div>
       </dialog>

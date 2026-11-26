@@ -1,111 +1,100 @@
 # RELAY NINE — The Signal Campaign
 
-**A finishable three-mission cyberpunk browser FPS, built to demonstrate AI-assisted game engineering and cybersecurity-themed interaction design.**
+**A three-level cyberpunk browser FPS designed to showcase AI-assisted game engineering, procedural 3D environments, deterministic enemy AI, and cybersecurity-inspired mechanics.**
 
-> **Status:** Private development milestone **0.4 — Facility Assault**. Three playable missions now share a much larger, navigable facility with corridors, side wings, cover, a gated north vault, patrolling hostiles that shoot back, 100-point player health, radar, sensitivity settings, a detailed carbine, and a towering multi-part mech boss. The enemy behavior is deterministic and scripted. Trained/adaptive AI, real security evidence analysis, and online LLM integration are **not implemented**.
+> **Private development build 0.5 — Three Distinct Fronts.** Separate 3D levels, more frequent enemy fire, collectible network artifacts, hold-the-zone uplinks, a moving 110-HP final boss with reinforcement waves, checkpoint retries, and a campaign achievement. The fictional adversaries use scripted game logic; trained/adaptive AI, real security evidence analysis, and online LLM integration are **not implemented**.
 
-The internal design codename is *Ghost Signal*, but a different public-facing title will be selected before launch because a commercial game uses that name.
+The internal creative codename is *Ghost Signal*. The user-facing title is Relay Nine.
 
-## Quick start
+## Play locally
 
-Requires Node.js **22.12+** and a recent desktop browser with WebGL 2. No API keys, accounts, databases, or paid services.
+Requires Node.js **22.12+**, a desktop mouse and keyboard, and a modern WebGL-capable browser. No keys, accounts, servers, databases, or AI credits are required.
 
 ```bash
 npm ci
 npm run dev
 ```
 
-Open the local address shown by Vite (normally **http://localhost:5173/**). In GitHub Codespaces, open the forwarded **5173** port. Click **Start Operation** to capture the mouse; press **Esc** to pause and release it. Choose **Field Manual** for a concise control reference and mission walkthrough.
+Open the Vite URL, usually **http://localhost:5173/**. In GitHub Codespaces, go to the forwarded **5173** port. Click **Start Operation** to play or **Field Manual** for a fast tutorial. **Esc** pauses and releases the mouse. The repo stays private until the owner approves publication.
 
-## Three short levels
+## The three levels
 
-| Mission | What you do | Security/engineering concept |
-|---|---|---|
-| **01 / Perimeter Breach** | Fight through the central corridor and side wings; defeat four patrolling magenta drones while avoiding the amber friendly. | Threat classification; false-positive penalties |
-| **02 / Signal Trace** | Navigate east/west wings and reach three glowing violet evidence terminals; press **E** close to each to scan while guards fire back. | Investigation; evidence-first response |
-| **03 / Ghost Protocol** | Shoot three crimson security locks; enter the opened north vault, defeat the 42-hit giant mech boss, then press **E** at the green shutdown console. | Layered containment; objective-gated enemy state and incident recovery |
+| Mission | Distinct map | Player objective | Cybersecurity / engineering theme |
+|---|---|---|---|
+| **01 / Base Floor** | Network operations floor, server racks, real corridors and side wings | Fight through **8** patrol drones; three marked carriers drop bright green **network fragments** when destroyed. Press **E** near each to collect it, then press **E** at the green computer to insert all three. | Artifact recovery, threat classification, restoration workflow |
+| **02 / Signal Foundry** | Industrial refinery floor with pipe tanks, new partitions and wide flanking lanes | Reach three separate purple **uplink towers**. Remain in each tower's glowing **7.5m radius for 9 seconds** to charge it to 100%. Keep fighting while capturing. **No E key** needed. | Infrastructure resilience, availability under pressure |
+| **03 / Sentinel Arena** | Open circular combat arena with cover and crimson warning lights | **Defeat Aegis-9**, a mobile 110-HP mech. An obvious top-screen health bar tracks armor. Four escort drones defend it, additional drones spawn on timers, and defeated escorts respawn. Killing the Sentinel is the **only** objective. | Threat prioritization, adversarial systems, resource management |
 
-An on-screen objective tracker and **direction-and-distance guidance** show what to do next. The new local tactical minimap shows nearby wall layout, the player heading, hostile contacts, the friendly drone, and active objectives. The map is larger than the former range and the north vault has a physical blast door that opens only after the final security locks are destroyed. Each mission has its own hostile difficulty, lighting, and win conditions. Completing a level unlocks the next briefing; the final debrief shows score, accuracy, time, and false positives. Everything works without an account or online API.
+Completing the final fight unlocks an in-game **GHOST PROTOCOL** achievement and victory/debrief screen with score, accuracy, elapsed time, and false positives. Missions are deliberately compact enough for portfolio reviewers to try in a short browser session.
 
-### Enemy combat and health
+### Combat and navigation
 
-- Hostiles follow authored patrol circuits and fire visible energy projectiles at players they can see. Corridors, walls, crates, and the vault door block shots; sliding and repositioning can evade projectiles.
-- Player health starts at **100 per mission**. Taking fire decreases the health bar. Reaching zero ends the mission and offers a campaign replay. *Network integrity* is separate: shooting a friendly decreases integrity instead.
-- Mission difficulty rises through tuned enemy speed, health, projectile velocity, attack frequency, and damage. The final mech is a larger, detailed model with **42 hit points** and its own faster projectile pattern.
-- This is an explainable deterministic game AI (scripted patrols, visibility checks, projectiles), not a model that learns or calls a service.
+- Hostile drones move through patrol routes, acquire targets in range, obey line-of-sight checks, and launch visible energy missiles. Each successive level has faster patrols, faster shots, and more frequent attacks. Cover stops projectiles; movement and sliding help evade them.
+- The ARC-7 carbine is built from detailed beveled geometry and physically based materials. Hitmarkers, recoil, reloads, pickups, colored beacons, the waypoint direction/distance display, and the tactical minimap keep combat legible.
+- Each mission starts with **100 health** and full ammo. Losing all health produces a **Defeat** menu with **Retry Mission 0X**—you do **not** have to replay missions you've already passed. Score and elapsed time reset to the start of that mission when retrying.
+- Completing missions 01 and 02 saves the **highest unlocked level number** (0, 1, or 2) to `localStorage` in the same browser. Returning players can continue their latest unlocked mission from the intro screen, or choose to restart from level 01. This is a local checkpoint, **not cloud sync**; clearing site data erases the preference.
+- The boss fight displays a dedicated red armor bar (`110 / 110`) and periodically introduces reinforcement drones at predetermined times while the Sentinel is alive.
+- An amber maintenance drone in the first level is friendly. Shooting it counts as a false positive and damages network integrity, a separate failure condition.
 
 ### Controls
 
-| Key | Action |
+| Input | Action |
 |---|---|
-| WASD / mouse | Move / look |
-| Left mouse | Fire the ARC-7 Pulse Carbine |
+| WASD / mouse | Move / look and aim |
+| Left click | Fire ARC-7 |
 | Shift | Sprint |
 | Space | Jump |
-| C or Ctrl while moving | Slide (Shift not required) |
-| E near a violet beacon or green console | Scan fictional evidence (mission 02) / shut down the mainframe (mission 03) |
+| C or Ctrl while moving | Slide and lower camera (Shift not required) |
+| E | Collect dropped fragments or upload to computer (**Mission 01 only**) |
+| Stand within purple ring | Charge uplink (**Mission 02 only; hold for 9 seconds**) |
 | R | Reload |
-| Tab | Toggle local engineering metrics |
-| Esc | Pause and release mouse |
+| Tab | Toggle local engineering/performance diagnostics |
+| Esc | Pause, access settings, release mouse |
 
-**Settings:** Pause with Esc to change the graphics preset or move the **mouse sensitivity slider** between 50% and 250%. The setting is stored only in your own browser.
+Mouse sensitivity adjusts from **50% to 250%** in settings and is saved locally. Audio is **off by default** and is synthesized in the browser if enabled. Reduced-motion preferences are respected. The tutorial can be opened from the menu at any time.
 
-**Important:** Targets are fictional scripted drones. Hostiles stay eliminated for the duration of a mission. Shooting the amber maintenance unit damages network integrity, and reaching zero ends the run. Progress is session-based; after completion you can replay the full campaign.
+## Engineering highlights
 
-### Quality and accessibility
-
-- Graphics presets: Auto, High, Medium, Low. Auto defaults to a lightweight mode and steps down automatically after sustained low FPS. Bloom is only enabled on High; Low removes bloom and ambient particles. Render resolution is budgeted to avoid overwhelming high-DPI screens.
-- Architecture is batched by material and the detailed, multi-part carbine is merged into only a few material batches. The expanded map uses approximately **140 visible meshes** in the first mission before temporary effects, keeping the FPS draw-call footprint modest even as the traversable space has grown. Performance still depends on the browser and GPU.
-- Materials use an original generated metal-grunge texture, physically based highlights, beveled weapon armor, detailed server-rack fronts, doorway trims, and a larger articulated mech silhouette. This is a **higher-detail stylized presentation**, not photorealistic AAA asset quality; professional authored PBR models and texture sets would be a separate art-production pass.
-- The menu and combat HUD have an independent violet/lime visual identity instead of the BREACHWAVE-inspired SOC card layout. Sliding includes a visible camera drop, field-of-view change, and on-screen feedback. Mission 02 introduces violet signal architecture; mission 03 shifts toward an urgent crimson containment palette.
-- Browser audio is **off by default** and only synthesized locally when switched on.
-- Respects `prefers-reduced-motion` (no bloom in reduced-motion mode).
-- The starting menu, tutorial, settings, next-mission transition, result debrief, and notifications use accessible HTML controls and text cues.
-- The minimap uses a small, independently drawn 2D canvas instead of a second 3D camera render; its update rate is deliberately limited to reduce GPU load.
-- The core FPS controls are designed for a desktop mouse and keyboard. Mobile play is out of scope for this milestone.
-
-## Engineering architecture
-
-| Module | Role |
+| Module | Scope |
 |---|---|
-| `src/simulation.ts` | Pure, deterministic player movement, collision checks, scoring, and false-positive consequences |
-| `src/campaign.ts` | Pure event-driven mission state machine, progression guards, and objectives |
-| `src/facility.ts` | Single source of truth for corridor wall coordinates, doorway layout, and vault door collision |
-| `src/combat.ts` | Pure combat difficulty tables, projectile collision, cover/visibility and health math |
-| `src/arena.ts` | Procedural Three.js facility, rounded high-detail carbine, patrol drones, boss mech, projectile visuals, raycast shooting |
-| `src/main.ts` | FPS input, player health, tactical minimap, sensitivity, mission states and graphics presets |
-| `src/audio.ts` | Optional original synthesized sound feedback using Web Audio |
-| `src/styles.css` | Responsive menu, manual, and combat overlays |
-| `tests/*.test.ts` | Automated progression, mission interactions, arena raycasts, movement, scoring, and UI contract tests |
+| `src/arena.ts` | Three separate authored/procedural Three.js scenes; batchable mesh geometry; materials; pickups; uplinks; detailed weapon and mech; independent scripted drone populations; projectile feedback |
+| `src/facility.ts` | Authoritative original base-floor wall and doorway geometry |
+| `src/combat.ts` | Pure combat tuning, collision, line of sight and projectile dynamics |
+| `src/objectives.ts` | Deterministic hold-radius capture state machine; progress pauses when operator leaves the zone |
+| `src/campaign.ts` | Mission event validation, objective gating, checkpoint bounds |
+| `src/simulation.ts` | Pure character physics, wall collision, slide/sprint/jump and shooting statistics |
+| `src/main.ts` | Stage transition/recovery, keyboard/mouse input, player health, checkpoint storage, minimap and UI |
+| `src/styles.css` | Original violet/lime UI plus dedicated capture, boss, victory, tutorial and responsive overlays |
+| `tests/*.test.ts` | Mission state, reachability, controls, capture timing, drop/raycast integration, respawning combat and UI contract |
 
-Run verification before committing:
+The Three.js game uses procedural models and an original code-generated metal texture; assets require no external download or third-party image license. Static geometry is merged per material to reduce render calls. A local 2D canvas minimap avoids a second 3D renderer. **Auto** graphics chooses a moderate resolution budget and steps down to Low on sustained lag; bloom is High-only. Actual frame rate depends on the device and browser.
+
+### Testing
 
 ```bash
 npm run check
 ```
 
-The check executes deterministic unit tests, TypeScript typechecking, and a production Vite build. GitHub Actions runs it for every push to `main` and for pull requests.
+`check` runs automated Node/TypeScript tests, TypeScript static validation, and the optimized Vite production build. GitHub Actions runs the same checks for pushes and pull requests.
 
-Optional desktop-browser smoke test (requires an installed Chromium browser):
+For an optional browser-based UI smoke test with a locally installed Chrome/Chromium binary:
 
 ```bash
 npm run smoke
 ```
 
-The smoke test starts Vite, checks the menu and deployment flow, captures local screenshots under `artifacts/`, and reports browser errors. It uses an installed Google Chrome browser by default; set `CHROMIUM_PATH` to use a specific Chrome/Chromium executable instead. This optional check requires a browser installed outside Node dependencies.
+The smoke tool may require a `CHROMIUM_PATH` environment variable; the CI unit/build checks do not require Chrome.
 
-## Roadmap
+## Development history and next improvements
 
-1. **First Contact / Performance & Identity (shipped v0.2):** Core 3D scene, responsive movement/sprint/jump/slide, pulse carbine, batched geometry, graphics options, distinct combat HUD.
-2. **The Signal Campaign (shipped v0.3):** Three levels, evidence-beacon interaction, objective tracking and wayfinding, AI-themed security locks, sentinel encounter, stage briefs and debrief.
-3. **Facility Assault (shipped v0.4):** Expanded corridor/wing/vault map, live enemy patrols and incoming fire, player health, minimap, configurable sensitivity, fortified gated vault, larger boss mech and higher-detail procedural weapon/environment materials.
-4. **Presentation (future):** Professionally authored 3D/PBR asset packs, dynamic soundscapes, improved enemy animations and cinematic mission transitions; optimize and profile on actual GPUs.
-5. **Portfolio Release (future):** Full browser playtesting across machines, security/privacy audit, verified asset licenses, public GitHub Pages, short gameplay video, technical write-up.
+1. **v0.2 / First Contact:** responsive movement, energy weapon, graphics presets, original combat HUD.
+2. **v0.3 / Signal Campaign:** initial three-mission scenario, waypoint objectives and Sentinel prototype.
+3. **v0.4 / Facility Assault:** expanded base-floor corridors and cover, incoming hostile projectiles, health/radar, configurable mouse sensitivity, advanced weapon and mech models.
+4. **v0.5 / Three Distinct Fronts (current):** independently instantiated 3D maps, carrier fragment drops, charged uplink defense, multi-wave mobile boss encounter with highly visible HP, same-stage defeat retries, local stage unlocks, final achievement.
+5. **Future:** device-specific performance tuning, audio/FX improvements, additional original 3D/PBR models, gamepad and accessibility polish, gameplay trailer, owner-approved privacy audit and optional public GitHub Pages launch.
 
-## Privacy and security boundaries
+## Privacy and AI disclosure
 
-Everything displayed is fictional and rendered locally. This prototype contains **no real security telemetry, credentials, employer systems, analytics, backend, third-party trackers, or model API calls**. Optional personal-best score and mouse sensitivity preferences stay in browser local storage. Source geometry and textures are generated by code rather than downloaded from external asset libraries.
+The entire game operates on **synthetic, fictional gameplay data**. There are **no real security telemetry feeds, employer systems, personal-information inputs, accounts, analytics services, tracking scripts, model API keys, or live LLM calls**. Only the unlocked mission number, optional sensitivity, and best score are saved to local browser storage.
 
-This is a videogame simulation, not an intrusion detection or response product. The “AI” is a fictional boss and authored state rules; no model is trained, called, or billed. AI assistance was used for software creation, while the product direction and playtesting priorities were defined by the owner.
-
-The repo remains **private** until the owner reviews and explicitly approves public release.
+The rogue AI antagonist is fictional; enemies are deterministic authored state machines, not trained agents. This repo demonstrates AI-assisted software development and human-directed engineering iteration, **not** a live AI integration or production cybersecurity tool. Source code and assets are to remain **private** until the repository owner explicitly approves a public release.

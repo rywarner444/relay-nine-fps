@@ -63,6 +63,24 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .objective-progress-caption { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-top: 10px; color: #a0a4bd; font-weight: 850; font-size: 9px; letter-spacing: .12em; }
 .objective-progress-caption strong { color: #f7f8ff; font-size: 12px; }
 
+/* Dedicated mission mechanics: persistent capture feedback and high-visibility boss armor. */
+.capture-panel { position: absolute; z-index: 6; left: 50%; bottom: 140px; transform: translateX(-50%); width: min(520px, 52vw); padding: 13px 18px 16px; background: #100c24e8; border: 1px solid #b99cff90; border-top: 3px solid #b99cff; box-shadow: 0 10px 40px #050316a9; }
+.capture-top, .boss-top { display: flex; align-items: center; justify-content: space-between; gap: 14px; color: #f1edff; letter-spacing: .13em; font-size: 10px; font-weight: 900; }
+.capture-top strong { color: #ddd0ff; }
+#captureText { color: #d8cbff; text-align: right; }
+.capture-track { height: 10px; background: #32234d; margin-top: 12px; border: 1px solid #a686e640; overflow: hidden; }
+.capture-track span { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #7c5cf2, #e7c6ff); box-shadow: 0 0 18px #ac8aff; transition: width .14s linear; }
+.capture-panel[data-in-range="true"] { border-top-color: var(--lime); }
+.capture-panel[data-in-range="true"] #captureText { color: var(--lime); }
+.boss-panel { position: absolute; z-index: 6; top: 84px; left: 50%; transform: translateX(-50%); width: min(580px, 52vw); padding: 14px 20px 13px; background: linear-gradient(110deg, #240d20f0, #160b19eb); border: 1px solid #ff66878a; border-top: 3px solid #ff537c; box-shadow: 0 12px 50px #12020cbb; }
+.boss-top { gap: 12px; }
+.boss-top strong { font-size: 12px; color: #fff6f7; white-space: nowrap; }
+.boss-alert { color: #ff7292; white-space: nowrap; font-size: 9px; }
+#bossHpText { white-space: nowrap; font-variant-numeric: tabular-nums; color: #ffb9c7; font-size: 10px; }
+.boss-track { height: 12px; margin-top: 13px; background: #361322; border: 1px solid #b4486a65; }
+.boss-track span { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #ae254a, #ff5988 75%, #ffc7a7); box-shadow: 0 0 15px #ff577b99; transition: width .11s linear; }
+.boss-subline { display: flex; justify-content: space-between; gap: 15px; margin-top: 8px; color: #b98d9f; font-size: 8px; font-weight: 900; letter-spacing: .12em; }
+
 .telemetry-panel { left: 2.8%; bottom: 37px; width: 270px; padding: 17px 23px 20px; border-left: 2px solid #ac93ff; }
 .telemetry-panel .eyebrow { display: flex; align-items: center; gap: 10px; color: #c5b3ff; }
 .telemetry-panel .live-dot { background: #c6adff; box-shadow: 0 0 14px #ad90ff88; }
@@ -100,7 +118,6 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .slide-status span { display: block; font-size: 8px; letter-spacing: .3em; margin-top: 2px; }
 .waypoint-panel { position: absolute; z-index: 5; top: 87px; left: 50%; transform: translateX(-50%); max-width: 94vw; padding: 9px 19px; background: #101022ce; border-top: 2px solid #aa8dff; color: #e5defb; font-size: 10px; font-weight: 900; letter-spacing: .15em; white-space: nowrap; text-align: center; pointer-events: none; }
 .waypoint-panel.interact-ready { border-top-color: var(--lime); color: var(--lime); background: #1c1c28ed; box-shadow: 0 4px 24px #a4ff7144; }
-.boss-health { margin-top: 10px; color: var(--coral); font-size: 10px; font-weight: 900; letter-spacing: .15em; }
 .toast { left: 50%; top: 25%; transform: translateX(-50%) skew(-5deg); padding: 12px 24px; max-width: 76vw; text-align: center; color: #171624; font-size: 11px; font-weight: 950; letter-spacing: .14em; background: var(--lime); box-shadow: 7px 7px 0 #8b72b6aa; }
 .toast[data-kind="danger"] { background: #ff7289; color: #1b0c18; }
 .toast[data-kind="success"] { background: #d3ff82; }
@@ -162,11 +179,17 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .debrief { max-width: 570px; border-left: 3px solid var(--lime); margin-top: 24px; padding: 12px 17px; background: #202038b5; display: grid; gap: 10px; }
 .debrief strong { font-size: clamp(16px, 2vw, 26px); color: #f5f0ff; letter-spacing: .05em; }
 .debrief > span { color: #c8c1ed; font-size: 10px; letter-spacing: .06em; line-height: 1.65; }
+.achievement-panel { display: flex; align-items: center; gap: 19px; border: 1px solid #e6ff7b78; border-left: 5px solid var(--lime); padding: 17px 23px; margin-top: 18px; max-width: 570px; background: linear-gradient(100deg, #283420df, #17192ba9); box-shadow: 0 0 45px #e6ff7b16; }
+.achievement-icon { font-size: 40px; font-weight: 900; color: var(--lime); text-shadow: 0 0 25px #e6ff7ba8; }
+.achievement-panel strong { display: block; font-size: 24px; letter-spacing: .15em; margin-top: 8px; color: #f0ffbd; }
+.achievement-panel p { margin: 7px 0 0; padding: 0; border: 0; font-size: 11px; line-height: 1.4; color: #c6d2b4; }
 .mission-track { margin-top: 21px; font-size: 27px; letter-spacing: .4em; color: var(--lime); }
 body[data-mission="2"] .objective-panel { border-left-color: #ba92ff; }
 body[data-mission="2"] .objective-progress span { background: #ba92ff; box-shadow: 0 0 16px #ba92ff; }
 body[data-mission="3"] .objective-panel { border-left-color: #ff637f; }
 body[data-mission="3"] .objective-progress span { background: #ff637f; box-shadow: 0 0 16px #ff637f; }
+body[data-mission="3"] .objective-panel { top: 255px; }
+body[data-mission="3"] .waypoint-panel { top: 207px; }
 
 .mission-card { position: relative; min-height: 425px; padding: 22px 0 27px 28px; border-left: 1px solid #9d84f37d; display: flex; flex-direction: column; justify-content: flex-end; }
 .mission-card::after { content: ''; position: absolute; top: 0; left: -3px; width: 5px; height: 65px; background: var(--lime); }
@@ -243,6 +266,14 @@ body[data-mission="3"] .objective-progress span { background: #ff637f; box-shado
   .engineering-toggle { left: 12px; bottom: 209px; }
   .engineering-panel { left: 12px; bottom: 246px; width: 275px; }
   .manual-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .boss-panel { top: 215px; width: calc(100% - 24px); padding: 10px; }
+  body[data-mission="3"] .objective-panel { top: 74px; }
+  body[data-mission="3"] .waypoint-panel { top: 340px; }
+  .boss-top { flex-wrap: wrap; font-size: 8px; }
+  .boss-top strong { font-size: 10px; }
+  .boss-subline { font-size: 7px; }
+  .capture-panel { bottom: 126px; width: calc(100% - 24px); }
+  .achievement-panel strong { font-size: 19px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

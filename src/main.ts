@@ -5,7 +5,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RelayNineArena, type GraphicsTier } from './arena';
 import { RangeAudio } from './audio';
-import { MISSIONS, missionProgress, recordMissionEvent, startMission, type CampaignState } from './campaign';
+import { CHECKPOINT_KEY, MISSIONS, missionProgress, recordMissionEvent, safeCheckpoint, startMission, type CampaignState } from './campaign';
 import { applyPlayerDamage } from './combat';
 import {
   advancePlayer, initialPlayer, initialStats, recordShot, shotAccuracy,
@@ -48,10 +48,11 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.34;
 
-const arena = new RelayNineArena();
+let arena = new RelayNineArena();
 const audio = new RangeAudio();
 const composer = new EffectComposer(renderer);
-composer.addPass(new RenderPass(arena.scene, arena.camera));
+const scenePass = new RenderPass(arena.scene, arena.camera);
+composer.addPass(scenePass);
 const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.52, 0.55, 0.89);
 composer.addPass(bloom);
 composer.addPass(new OutputPass());
@@ -88,6 +89,9 @@ let autoTierOverride: GraphicsTier | null = null;
 let notifyTimer: number | undefined;
 let hitTimer: number | undefined;
 let taskComplete = false;
+let unlockedLevel = 0;
+let stageStartStats: RangeStats = initialStats();
+let stageStartTime = 0;
 let runTime = 0;
 let waypointRefresh = 0;
 let minimapRefresh = 0;
@@ -99,7 +103,26 @@ function setVisibleGameHud(visible: boolean): void {
   for (const id of [
     'hudTop', 'objectivePanel', 'telemetryPanel', 'crosshair', 'weaponPanel', 'movementHint', 'engineeringButton', 'waypointPanel', 'minimapPanel',
   ]) element<HTMLElement>(id).hidden = !visible;
+  element<HTMLElement>('capturePanel').hidden = !visible || campaign.mission !== 1;
+  element<HTMLElement>('bossPanel').hidden = !visible || campaign.mission !== 2;
   if (!visible) engineeringPanel.hidden = true;
+}
+
+function readCheckpoint(): number {
+  try { return safeCheckpoint(localStorage.getItem(CHECKPOINT_KEY)); } catch { return 0; }
+}
+
+function unlockLevel(index: number): void {
+  if (index <= unlockedLevel) return;
+  unlockedLevel = index;
+  try { localStorage.setItem(CHECKPOINT_KEY, String(unlockedLevel)); } catch { /* Optional local-only storage. */ }
+}
+
+function updateBossHud(): void {
+  if (campaign.mission !== 2) return;
+  const remaining = Math.max(0, arena.sentinelHealth);
+  element('bossHpText').textContent = `${remaining} / ${arena.sentinelMaxHealth} ARMOR`;
+  element<HTMLElement>('bossFill').style.width = `${remaining / arena.sentinelMaxHealth * 100}%`;
 }
 
 function announce(message: string, kind: 'neutral' | 'success' | 'danger' = 'neutral', duration = 2900): void {
@@ -130,11 +153,11 @@ function updateStats(): void {
   element('objectiveCaption').textContent = progress.label;
   element('objectiveCount').textContent = `${progress.current} / ${progress.total}`;
   element<HTMLElement>('objectiveFill').style.width = `${progress.current / progress.total * 100}%`;
-  element('bossHealth').textContent = campaign.mission === 2 && campaign.completed.length >= 3
-    && !campaign.completed.includes('SENTINEL') ? `SENTINEL ARMOR // ${Math.max(0, Math.ceil(arena.sentinelHealth / arena.sentinelMaxHealth * 100))}%` : '';
+  updateBossHud();
   if (progress.complete && !taskComplete) {
     taskComplete = true;
-    announce('MISSION COMPLETE // SECURITY OBJECTIVES MET', 'success', 3500);
+    unlockLevel(Math.min(MISSIONS.length - 1, campaign.mission + 1));
+    announce(campaign.mission === 2 ? 'SENTINEL DESTROYED // ACHIEVEMENT UNLOCKED' : 'MISSION COMPLETE // CHECKPOINT SAVED', 'success', 3500);
     audio.destroy();
     pauseGame();
     menuMode = campaign.mission === MISSIONS.length - 1 ? 'victory' : 'between';
@@ -150,30 +173,33 @@ function updateStats(): void {
 }
 
 function showMenu(mode: typeof menuMode): void {
-  const next = mode === 'between' ? MISSIONS[campaign.mission + 1] : MISSIONS[campaign.mission];
+  const next = mode === 'between' ? MISSIONS[campaign.mission + 1] : mode === 'intro' ? MISSIONS[unlockedLevel] : MISSIONS[campaign.mission];
   const current = MISSIONS[campaign.mission];
   const completed = mode === 'victory';
   const failed = mode === 'failed';
   const between = mode === 'between';
   const pausedHere = mode === 'pause';
-  element('menuHeadline').innerHTML = completed ? 'FACILITY<br><em>SECURED.</em>'
+  element('menuHeadline').innerHTML = completed ? 'SIGNAL<br><em>SECURED.</em>'
     : failed ? 'SIGNAL<br><em>LOST.</em>'
       : between ? 'MISSION<br><em>CLEARED.</em>'
         : pausedHere ? 'OPERATION<br><em>PAUSED.</em>' : 'ENTER THE<br><em>UNKNOWN.</em>';
   element('menuDescription').textContent = completed
-    ? 'You classified threats, followed the evidence, and contained a fictional rogue AI. Three operations. One recovered facility.'
-    : failed ? failureReason
+    ? 'Aegis-9 neutralized. You recovered the network fragments, secured three uplinks under fire, and survived the Sentinel arena. Your achievement is unlocked.'
+    : failed ? `${failureReason} Progress saved: retry Mission ${MISSIONS[campaign.mission].number} without replaying earlier levels.`
       : between ? `${current.name} complete. ${next.briefing}`
         : pausedHere ? `Mission ${current.number}: ${current.briefing}`
-          : 'Fight through a larger cyberpunk facility with corridors, hostile patrols, incoming fire, a tactical radar, and a final mech boss. No accounts or real security systems.';
+          : unlockedLevel > 0 ? `Checkpoint detected! Continue at Mission ${next.number}: ${next.briefing}`
+            : 'Three unique maps: recover network fragments, hold three uplink zones under fire, and defeat a giant mobile mech with endless drone reinforcements. Fictional and offline.';
   element('missionNumber').textContent = next.number;
   element('missionName').textContent = next.name;
   element('missionDescription').textContent = next.lesson;
   element('menuMissionNumber').textContent = `[ MISSION ${next.number} / 03 ]`;
   element('missionTag').textContent = next.codename;
-  element('menuStatus').textContent = completed ? 'CAMPAIGN COMPLETE' : failed ? 'SIMULATION FAILED' : between ? 'NEXT ASSIGNMENT' : pausedHere ? 'PAUSED' : '3-MISSION MICRO CAMPAIGN';
-  deployButton.innerHTML = completed || failed ? '<span>↻</span> REPLAY CAMPAIGN'
-    : between ? '<span>▶</span> NEXT MISSION' : pausedHere ? '<span>▶</span> RESUME OPERATION' : '<span>▶</span> START OPERATION';
+  element('menuStatus').textContent = completed ? 'CAMPAIGN COMPLETE' : failed ? 'OPERATOR DOWN / CHECKPOINT SAVED' : between ? 'NEW MAP UNLOCKED' : pausedHere ? 'PAUSED' : unlockedLevel > 0 ? 'SAVED CHECKPOINT' : '3-MISSION CAMPAIGN';
+  deployButton.innerHTML = completed ? '<span>↻</span> REPLAY CAMPAIGN'
+    : failed ? `<span>↻</span> RETRY MISSION ${current.number}`
+      : between ? '<span>▶</span> NEXT MISSION' : pausedHere ? '<span>▶</span> RESUME OPERATION'
+        : unlockedLevel > 0 ? `<span>▶</span> CONTINUE MISSION ${next.number}` : '<span>▶</span> START OPERATION';
   const debrief = element<HTMLElement>('debrief');
   debrief.hidden = !(completed || failed);
   if (!debrief.hidden) {
@@ -186,7 +212,9 @@ function showMenu(mode: typeof menuMode): void {
       } catch { /* Browser local storage is optional. */ }
     }
   }
-  restartButton.hidden = mode === 'intro' || completed || failed;
+  element<HTMLElement>('achievementPanel').hidden = !completed;
+  restartButton.hidden = completed || mode === 'intro' && unlockedLevel === 0;
+  restartButton.textContent = '↻ RESTART FROM MISSION 01';
   menuOverlay.hidden = false;
 }
 
@@ -311,8 +339,13 @@ function resize(): void {
 
 function enterMission(index: number): void {
   campaign = startMission(index);
-  arena.setMission(index);
+  const priorArena = arena;
+  arena = new RelayNineArena(index);
+  scenePass.scene = arena.scene;
+  scenePass.camera = arena.camera;
+  priorArena.dispose();
   player = initialPlayer();
+  if (index === 2) player = { ...player, z: 36 };
   playerHealth = 100;
   damageCooldown = 0;
   failureReason = '';
@@ -323,12 +356,17 @@ function enterMission(index: number): void {
   pitch = -0.03;
   slideBuffer = 0;
   slidePressed = false;
+  stageStartStats = { ...stats };
+  stageStartTime = runTime;
+  element<HTMLElement>('capturePanel').hidden = index !== 1;
+  element<HTMLElement>('bossPanel').hidden = index !== 2;
   element<HTMLElement>('slideStatus').hidden = true;
   element<HTMLElement>('speedLines').classList.remove('active');
   element('hudMission').textContent = `${MISSIONS[index].name} / ${String(index + 1).padStart(2, '0')} OF 03`;
   element('objectiveStep').textContent = `0${index + 1} / 03`;
   element('missionStrip').textContent = MISSIONS.map((_, i) => i < index ? '◆' : i === index ? '◈' : '◇').join('  ');
   document.body.dataset.mission = String(index + 1);
+  resize();
   updateStats();
   updateAmmo();
   updatePlayerHealth();
@@ -351,9 +389,13 @@ async function requestLock(): Promise<void> {
 }
 
 async function deploy(): Promise<void> {
-  if (menuMode === 'victory' || menuMode === 'failed') resetCampaign();
-  else if (menuMode === 'between') enterMission(campaign.mission + 1);
-  else if (!sessionStarted) enterMission(0);
+  if (menuMode === 'victory') resetCampaign();
+  else if (menuMode === 'failed') {
+    stats = { ...stageStartStats };
+    runTime = stageStartTime;
+    enterMission(campaign.mission);
+  } else if (menuMode === 'between') enterMission(campaign.mission + 1);
+  else if (!sessionStarted) enterMission(unlockedLevel);
   menuMode = 'pause';
   sessionStarted = true;
   paused = false;
@@ -407,9 +449,7 @@ function shoot(now: number): void {
   const hit = arena.fire();
   stats = recordShot(stats, hit.kind, hit.destroyed);
   if (hit.destroyed && hit.targetId) {
-    if (hit.kind === 'objective') campaign = recordMissionEvent(campaign, { type: 'lock', id: hit.targetId });
-    else if (hit.targetId === 'SENTINEL') campaign = recordMissionEvent(campaign, { type: 'sentinel', id: hit.targetId });
-    else if (hit.kind === 'hostile') campaign = recordMissionEvent(campaign, { type: 'elimination', id: hit.targetId });
+    if (hit.targetId === 'SENTINEL') campaign = recordMissionEvent(campaign, { type: 'boss', id: 'SENTINEL' });
   }
   audio.fire();
   if (hit.kind !== 'miss') {
@@ -420,12 +460,10 @@ function shoot(now: number): void {
       element<HTMLElement>('damageFlash').classList.remove('pulse');
       void element<HTMLElement>('damageFlash').offsetWidth;
       element<HTMLElement>('damageFlash').classList.add('pulse');
-    } else if (hit.kind === 'objective') {
-      audio.destroy();
-      announce(campaign.completed.length === 3 ? 'FIREWALL DOWN // SENTINEL EXPOSED' : 'AI SECURITY LOCK DISABLED', 'success', 2300);
     } else if (hit.destroyed) {
       audio.destroy();
-      announce('HOSTILE SIGNATURE NEUTRALIZED', 'success', 1200);
+      announce(campaign.mission === 0 && ['I-01', 'I-04', 'I-07'].includes(hit.targetId ?? '')
+        ? 'CARRIER DOWN // COLLECT GREEN NETWORK FRAGMENT WITH E' : 'HOSTILE SIGNATURE NEUTRALIZED', 'success', 2100);
     } else audio.hit();
   }
   if (ammo === 0) reload();
@@ -434,16 +472,17 @@ function shoot(now: number): void {
 }
 
 function collectEvidence(): void {
-  if (![1, 2].includes(campaign.mission) || paused) return;
+  if (campaign.mission !== 0 || paused) return;
   const id = arena.scanNearby(player.x, player.z);
   if (!id) {
-    if (campaign.mission === 1) announce('MOVE CLOSER TO A VIOLET EVIDENCE BEACON', 'neutral', 1800);
     return;
   }
-  campaign = recordMissionEvent(campaign, id === 'SHUTDOWN' ? { type: 'shutdown', id } : { type: 'evidence', id });
-  stats = { ...stats, score: stats.score + (id === 'SHUTDOWN' ? 600 : 300) };
+  campaign = id === 'UPLOAD' ? recordMissionEvent(campaign, { type: 'upload', id: 'UPLOAD' })
+    : recordMissionEvent(campaign, { type: 'fragment', id });
+  stats = { ...stats, score: stats.score + (id === 'UPLOAD' ? 600 : 250) };
   audio.destroy();
-  announce(id === 'SHUTDOWN' ? 'MAINFRAME SHUT DOWN // NETWORK RECOVERED' : `EVIDENCE VERIFIED // ${id} CAPTURED`, 'success', 2600);
+  announce(id === 'UPLOAD' ? 'NETWORK FRAGMENTS INSERTED // BASE FLOOR CLEARED'
+    : `NETWORK FRAGMENT ${id} RECOVERED`, 'success', 2700);
   updateStats();
 }
 
@@ -456,8 +495,9 @@ function updateWaypoint(): void {
   const side = Math.cos(yaw) * dx - Math.sin(yaw) * dz;
   const angle = Math.atan2(side, ahead);
   const direction = Math.abs(angle) > 2.4 ? 'BEHIND' : angle < -0.48 ? '◀ LEFT' : angle > 0.48 ? 'RIGHT ▶' : '▲ AHEAD';
-  const action = (campaign.mission === 1 && nearby.distance <= 3.1 || nearby.id === 'SHUTDOWN' && nearby.distance <= 3.5)
-    ? nearby.id === 'SHUTDOWN' ? ' · PRESS E TO SHUT DOWN' : ' · PRESS E TO SCAN' : '';
+  const action = campaign.mission === 0 && nearby.distance <= 3.5
+    ? nearby.id === 'UPLOAD' ? ' · PRESS E TO INSERT' : nearby.id.startsWith('FRAG') ? ' · PRESS E TO PICK UP' : ''
+      : campaign.mission === 1 && nearby.distance <= 7.5 ? ' · HOLD THIS ZONE' : '';
   panel.textContent = `◈ ${nearby.id}  /  ${Math.round(nearby.distance)}M  /  ${direction}${action}`;
   panel.classList.toggle('interact-ready', action.length > 0);
 }
@@ -527,6 +567,24 @@ function loop(timeMs: number): void {
       arena.camera.fov = nextFov;
       arena.camera.updateProjectionMatrix();
     }
+    if (campaign.mission === 1) {
+      const capture = arena.updateCapture(player.x, player.z, elapsed);
+      if (capture) {
+        const capturePanel = element<HTMLElement>('capturePanel');
+        capturePanel.hidden = false;
+        capturePanel.dataset.inRange = String(capture.inRange);
+        element('captureName').textContent = capture.id;
+        element('captureText').textContent = capture.inRange ? `${capture.percent}% // CAPTURING` : 'ENTER VIOLET RING TO CHARGE';
+        element<HTMLElement>('captureFill').style.width = `${capture.percent}%`;
+        if (capture.completed) {
+          campaign = recordMissionEvent(campaign, { type: 'charged', id: capture.id });
+          stats = { ...stats, score: stats.score + 450 };
+          audio.destroy();
+          announce(`${capture.id} SECURED // ${missionProgress(campaign).current} OF 3 UPLINKS`, 'success', 2400);
+          updateStats();
+        }
+      }
+    }
     if (fireHeld) shoot(timeMs / 1000);
     if (reloading > 0) {
       reloading -= elapsed;
@@ -542,7 +600,7 @@ function loop(timeMs: number): void {
 }
 
 deployButton.addEventListener('click', () => { void deploy(); });
-restartButton.addEventListener('click', () => { resetCampaign(); menuMode = 'intro'; void deploy(); });
+restartButton.addEventListener('click', () => { resetCampaign(); sessionStarted = true; menuMode = 'pause'; void deploy(); });
 manualDeploy.addEventListener('click', () => { manualDialog.close(); void deploy(); });
 element('tutorialButton').addEventListener('click', openManual);
 element('closeManual').addEventListener('click', () => manualDialog.close());
@@ -600,6 +658,7 @@ try {
 sensitivityRange.value = String(sensitivity);
 element('sensitivityValue').textContent = `${Math.round(sensitivity * 100)}%`;
 resetCampaign();
+unlockedLevel = readCheckpoint();
 showMenu('intro');
 setVisibleGameHud(false);
 renderer.setAnimationLoop(loop);
