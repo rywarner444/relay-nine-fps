@@ -2,9 +2,17 @@
 
 **A three-level cyberpunk browser FPS designed to showcase AI-assisted game engineering, procedural 3D environments, deterministic enemy AI, and cybersecurity-inspired mechanics.**
 
-> **Private development build 0.7 — Combat Readability.** Separate 3D levels, **18** faster-firing opponents on Mission 01, distinctly bright-green carrier halos and artifact pickups, a visible radial reload gauge with a weapon-lowering animation, an opaque depth-tested ARC-7 carbine, and an integrated Engineering View button. Earlier additions remain: proximity pickup prompts, a walkable dotted minimap route to the upload computer, three defended uplink captures, concise pre-level briefings, a mobile 110-HP final boss, checkpoint retries, and a campaign achievement. The fictional adversaries use scripted game logic; trained/adaptive AI, real security evidence analysis, and online LLM integration are **not implemented**.
+> **Portfolio release candidate 0.7 — Combat Readability.** Separate 3D levels, **18** faster-firing opponents on Mission 01, distinctly bright-green carrier halos and artifact pickups, a visible radial reload gauge with a weapon-lowering animation, an opaque depth-tested ARC-7 carbine, and an integrated Engineering View button. Earlier additions remain: proximity pickup prompts, a walkable dotted minimap route to the upload computer, three defended uplink captures, concise pre-level briefings, a mobile 110-HP final boss, checkpoint retries, and a campaign achievement. The fictional adversaries use scripted game logic; trained/adaptive AI, real security evidence analysis, and online LLM integration are **not implemented**.
 
 The internal creative codename is *Ghost Signal*. The user-facing title is Relay Nine.
+
+## Play directly in your browser
+
+**Launch URL after GitHub Pages is enabled:** https://rywarner444.github.io/relay-nine-fps/
+
+No installation, account, or API credits are needed to play the published static game. Desktop Chrome, Firefox, or Edge with a keyboard and mouse is recommended. The opening screen includes a Field Manual tutorial and a three-step mission briefing.
+
+To turn on publishing after the repository owner makes it public: visit **Settings → Pages → Build and deployment → Source: GitHub Actions**. In the **Actions** tab, run the **Deploy RELAY NINE to GitHub Pages** workflow manually if the automatic deployment hasn't started. Once the deployment job succeeds, the URL above becomes playable. Every later push to `main` automatically rebuilds, tests, and deploys the latest version.
 
 ## Play locally
 
@@ -15,7 +23,7 @@ npm ci
 npm run dev
 ```
 
-Open the Vite URL, usually **http://localhost:5173/**. In GitHub Codespaces, go to the forwarded **5173** port. Click **Start Operation**, read the compact three-step mission briefing, and then click **Engage Mission** to enter combat. **Field Manual** opens a full tutorial. **Esc** pauses and releases the mouse. The repo stays private until the owner approves publication.
+Open the Vite URL, usually **http://localhost:5173/**. In GitHub Codespaces, go to the forwarded **5173** port. Click **Start Operation**, read the compact three-step mission briefing, and then click **Engage Mission** to enter combat. **Field Manual** opens a full tutorial. **Esc** pauses and releases the mouse.
 
 ## The three levels
 
@@ -78,7 +86,7 @@ The Three.js game uses procedural models and an original code-generated metal te
 npm run check
 ```
 
-`check` runs automated Node/TypeScript tests, TypeScript static validation, and the optimized Vite production build. GitHub Actions runs the same checks for pushes and pull requests.
+`check` runs automated Node/TypeScript tests, TypeScript static validation, and the optimized Vite production build. GitHub Actions runs the same checks for pushes and pull requests. The Pages deployment workflow also runs `check` before publishing the built `dist/` files.
 
 For an optional browser-based UI smoke test with a locally installed Chrome/Chromium binary:
 
@@ -102,4 +110,4 @@ The smoke tool may require a `CHROMIUM_PATH` environment variable; the CI unit/b
 
 The entire game operates on **synthetic, fictional gameplay data**. There are **no real security telemetry feeds, employer systems, personal-information inputs, accounts, analytics services, tracking scripts, model API keys, or live LLM calls**. Only the unlocked mission number, optional sensitivity, and best score are saved to local browser storage.
 
-The rogue AI antagonist is fictional; enemies are deterministic authored state machines, not trained agents. This repo demonstrates AI-assisted software development and human-directed engineering iteration, **not** a live AI integration or production cybersecurity tool. Source code and assets are to remain **private** until the repository owner explicitly approves a public release.
+The rogue AI antagonist is fictional; enemies are deterministic authored state machines, not trained agents. This repo demonstrates AI-assisted software development and human-directed engineering iteration, **not** a live AI integration or production cybersecurity tool. Repository visibility and Pages availability are controlled by its owner in GitHub Settings.

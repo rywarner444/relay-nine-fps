@@ -60,5 +60,5 @@ test('the campaign distinguishes scripted game rules from real AI or security te
   assert.match(readme, /adaptive AI.*not implemented/i);
   assert.match(readme, /three levels/i);
   assert.match(readme, /no real security telemetry/i);
-  assert.match(readme, /private/i);
+  assert.match(readme, /GitHub Pages/i);
 });
