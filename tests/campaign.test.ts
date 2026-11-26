@@ -35,6 +35,9 @@ test('mission 3 requires all three locks before sentinel defeat counts', () => {
   assert.match(missionProgress(state).title, /sentinel/i);
   assert.equal(missionProgress(state).complete, false);
   state = recordMissionEvent(state, { type: 'sentinel', id: 'SENTINEL' });
+  assert.equal(missionProgress(state).complete, false, 'Network still requires a manual shutdown');
+  assert.match(missionProgress(state).title, /shut down/i);
+  state = recordMissionEvent(state, { type: 'shutdown', id: 'SHUTDOWN' });
   assert.equal(missionProgress(state).complete, true);
   assert.throws(() => startMission(3), RangeError);
 });

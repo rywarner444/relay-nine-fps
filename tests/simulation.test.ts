@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {
   advancePlayer, initialPlayer, initialStats, movementDirection,
-  recordShot, shotAccuracy, RANGE_GOAL,
+  recordShot, shotAccuracy,
 } from '../src/simulation.ts';
 
 const forward = { forward: 1, right: 0, sprint: false, jumpPressed: false, slidePressed: false };
@@ -63,10 +63,10 @@ test('jump lifts the player and gravity eventually returns them to the ground', 
 });
 
 test('blockers prevent passage without preventing wall sliding', () => {
-  const blocker = [{ x: 0, z: 16, halfWidth: 1, halfDepth: 0.25 }];
+  const blocker = [{ x: 0, z: 41, halfWidth: 1, halfDepth: 0.25 }];
   let player = initialPlayer();
   for (let i = 0; i < 20; i += 1) player = advancePlayer(player, forward, 0, 0.05, blocker);
-  assert.ok(player.z >= 16.25 + 0.46);
+  assert.ok(player.z >= 41.25 + 0.46);
   const strafed = advancePlayer(player, { ...forward, forward: 0, right: 1 }, 0, 0.05, blocker);
   assert.ok(strafed.x > player.x);
 });
@@ -85,7 +85,6 @@ test('scoring rewards verified hostile hits and tracks range progress', () => {
   assert.equal(stats.score, 200);
   assert.equal(stats.eliminations, 1);
   assert.equal(shotAccuracy(stats), 67);
-  assert.equal(RANGE_GOAL, 6);
 });
 
 test('false positives damage network integrity and can never make score negative', () => {

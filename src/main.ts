@@ -6,6 +6,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RelayNineArena, type GraphicsTier } from './arena';
 import { RangeAudio } from './audio';
 import { MISSIONS, missionProgress, recordMissionEvent, startMission, type CampaignState } from './campaign';
+import { applyPlayerDamage } from './combat';
 import {
   advancePlayer, initialPlayer, initialStats, recordShot, shotAccuracy,
   type PlayerMotion, type RangeStats,
@@ -28,6 +29,9 @@ const engineeringPanel = element<HTMLElement>('engineeringPanel');
 const qualitySelect = element<HTMLSelectElement>('qualitySelect');
 const soundButton = element<HTMLButtonElement>('soundButton');
 const ammoTrack = element<HTMLElement>('ammoTrack');
+const minimapCanvas = element<HTMLCanvasElement>('minimapCanvas');
+const minimapContext = minimapCanvas.getContext('2d');
+const sensitivityRange = element<HTMLInputElement>('sensitivityRange');
 
 let renderer: THREE.WebGLRenderer;
 try {
@@ -55,6 +59,10 @@ composer.addPass(new OutputPass());
 const keys = new Set<string>();
 let player: PlayerMotion = initialPlayer();
 let stats: RangeStats = initialStats();
+let playerHealth = 100;
+let damageCooldown = 0;
+let failureReason = '';
+let sensitivity = 1;
 let campaign: CampaignState = startMission(0);
 let sessionStarted = false;
 let paused = true;
@@ -82,13 +90,14 @@ let hitTimer: number | undefined;
 let taskComplete = false;
 let runTime = 0;
 let waypointRefresh = 0;
+let minimapRefresh = 0;
 let bobEye = 1.72;
 let lastWalkAmount = 0;
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
 function setVisibleGameHud(visible: boolean): void {
   for (const id of [
-    'hudTop', 'objectivePanel', 'telemetryPanel', 'crosshair', 'weaponPanel', 'movementHint', 'engineeringButton', 'waypointPanel',
+    'hudTop', 'objectivePanel', 'telemetryPanel', 'crosshair', 'weaponPanel', 'movementHint', 'engineeringButton', 'waypointPanel', 'minimapPanel',
   ]) element<HTMLElement>(id).hidden = !visible;
   if (!visible) engineeringPanel.hidden = true;
 }
@@ -122,7 +131,7 @@ function updateStats(): void {
   element('objectiveCount').textContent = `${progress.current} / ${progress.total}`;
   element<HTMLElement>('objectiveFill').style.width = `${progress.current / progress.total * 100}%`;
   element('bossHealth').textContent = campaign.mission === 2 && campaign.completed.length >= 3
-    ? `SENTINEL ARMOR // ${Math.max(0, Math.ceil(arena.sentinelHealth / 9 * 100))}%` : '';
+    && !campaign.completed.includes('SENTINEL') ? `SENTINEL ARMOR // ${Math.max(0, Math.ceil(arena.sentinelHealth / arena.sentinelMaxHealth * 100))}%` : '';
   if (progress.complete && !taskComplete) {
     taskComplete = true;
     announce('MISSION COMPLETE // SECURITY OBJECTIVES MET', 'success', 3500);
@@ -134,6 +143,7 @@ function updateStats(): void {
   if (stats.integrity <= 0 && menuMode !== 'failed' && !progress.complete) {
     pauseGame();
     menuMode = 'failed';
+    failureReason = 'Friendly network integrity reached zero. Be more selective about what you shoot.';
     showMenu('failed');
     announce('NETWORK INTEGRITY LOST // OPERATION FAILED', 'danger', 3500);
   }
@@ -152,10 +162,10 @@ function showMenu(mode: typeof menuMode): void {
         : pausedHere ? 'OPERATION<br><em>PAUSED.</em>' : 'ENTER THE<br><em>UNKNOWN.</em>';
   element('menuDescription').textContent = completed
     ? 'You classified threats, followed the evidence, and contained a fictional rogue AI. Three operations. One recovered facility.'
-    : failed ? 'Friendly network integrity reached zero. Reset and try again—accuracy matters more than speed.'
+    : failed ? failureReason
       : between ? `${current.name} complete. ${next.briefing}`
         : pausedHere ? `Mission ${current.number}: ${current.briefing}`
-          : 'Three short cyberpunk FPS missions. Identify a threat, follow the evidence, and shut down a rogue AI. No accounts or real security systems.';
+          : 'Fight through a larger cyberpunk facility with corridors, hostile patrols, incoming fire, a tactical radar, and a final mech boss. No accounts or real security systems.';
   element('missionNumber').textContent = next.number;
   element('missionName').textContent = next.name;
   element('missionDescription').textContent = next.lesson;
@@ -178,6 +188,88 @@ function showMenu(mode: typeof menuMode): void {
   }
   restartButton.hidden = mode === 'intro' || completed || failed;
   menuOverlay.hidden = false;
+}
+
+function updatePlayerHealth(): void {
+  element('healthValue').textContent = `${playerHealth} / 100`;
+  element<HTMLElement>('healthFill').style.width = `${playerHealth}%`;
+  element<HTMLElement>('healthFill').classList.toggle('critical', playerHealth <= 30);
+  element('healthState').textContent = playerHealth <= 30 ? 'CRITICAL // SEEK COVER' : playerHealth <= 65 ? 'ARMOR DAMAGED' : 'OPERATOR READY';
+}
+
+function receiveDamage(amount: number): void {
+  if (paused || amount <= 0 || damageCooldown > 0) return;
+  damageCooldown = 0.6;
+  playerHealth = applyPlayerDamage(playerHealth, amount);
+  updatePlayerHealth();
+  audio.warning();
+  const flash = element<HTMLElement>('damageFlash');
+  flash.classList.remove('pulse');
+  void flash.offsetWidth;
+  flash.classList.add('pulse');
+  if (playerHealth <= 0) {
+    failureReason = 'Your armor was depleted by hostile fire. Use cover, keep moving, and slide through incoming projectiles.';
+    announce('OPERATOR DOWN // SIGNAL LOST', 'danger', 3500);
+    pauseGame();
+    menuMode = 'failed';
+    showMenu('failed');
+  } else if (playerHealth <= 30) announce('CRITICAL HEALTH // FIND COVER', 'danger', 2100);
+}
+
+function drawMinimap(): void {
+  if (!minimapContext) return;
+  const ctx = minimapContext;
+  const size = minimapCanvas.width;
+  const center = size / 2;
+  const scale = 5.0; // Local 23m radius: clear walls, doors, and nearby contacts.
+  ctx.clearRect(0, 0, size, size);
+  ctx.fillStyle = '#070c1b';
+  ctx.fillRect(0, 0, size, size);
+  ctx.strokeStyle = '#53528047';
+  ctx.lineWidth = 1;
+  for (let i = -4; i <= 4; i += 1) {
+    const v = center + i * 25;
+    ctx.beginPath(); ctx.moveTo(v, 0); ctx.lineTo(v, size); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, v); ctx.lineTo(size, v); ctx.stroke();
+  }
+  const xAt = (worldX: number): number => center + (worldX - player.x) * scale;
+  const yAt = (worldZ: number): number => center + (worldZ - player.z) * scale;
+  for (const block of arena.blockers) {
+    const width = block.halfWidth * 2 * scale;
+    const depth = block.halfDepth * 2 * scale;
+    const x = xAt(block.x) - width / 2;
+    const y = yAt(block.z) - depth / 2;
+    if (x > size || y > size || x + width < 0 || y + depth < 0) continue;
+    ctx.fillStyle = width > 20 || depth > 20 ? '#4d567b' : '#38485d';
+    ctx.fillRect(x, y, width, depth);
+    ctx.strokeStyle = '#7d96b790';
+    ctx.strokeRect(x, y, width, depth);
+  }
+  for (const blip of arena.tacticalBlips) {
+    const x = xAt(blip.x);
+    const y = yAt(blip.z);
+    if (x < 3 || y < 3 || x > size - 3 || y > size - 3) continue;
+    ctx.fillStyle = blip.type === 'friendly' ? '#ffcc71' : blip.type === 'objective' ? '#b396ff' : blip.type === 'boss' ? '#ff4a78' : '#ff607e';
+    ctx.beginPath(); ctx.arc(x, y, blip.type === 'boss' ? 6 : blip.type === 'objective' ? 5 : 3.8, 0, Math.PI * 2); ctx.fill();
+    if (blip.type === 'objective' || blip.type === 'boss') {
+      ctx.strokeStyle = ctx.fillStyle;
+      ctx.lineWidth = 1.2;
+      ctx.strokeRect(x - 8, y - 8, 16, 16);
+    }
+  }
+  // North-up local radar. A rotating triangular operator marker indicates facing.
+  ctx.save();
+  ctx.translate(center, center);
+  ctx.rotate(-yaw);
+  ctx.fillStyle = '#e6ff7b';
+  ctx.strokeStyle = '#061018';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, -11); ctx.lineTo(-6, 8); ctx.lineTo(0, 4); ctx.lineTo(6, 8); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.restore();
+  ctx.strokeStyle = '#c4baffb0';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(1, 1, size - 2, size - 2);
 }
 
 function updateAmmo(): void {
@@ -221,6 +313,9 @@ function enterMission(index: number): void {
   campaign = startMission(index);
   arena.setMission(index);
   player = initialPlayer();
+  playerHealth = 100;
+  damageCooldown = 0;
+  failureReason = '';
   ammo = 30;
   reloading = 0;
   taskComplete = false;
@@ -236,6 +331,8 @@ function enterMission(index: number): void {
   document.body.dataset.mission = String(index + 1);
   updateStats();
   updateAmmo();
+  updatePlayerHealth();
+  drawMinimap();
 }
 
 function resetCampaign(): void {
@@ -337,13 +434,16 @@ function shoot(now: number): void {
 }
 
 function collectEvidence(): void {
-  if (campaign.mission !== 1 || paused) return;
+  if (![1, 2].includes(campaign.mission) || paused) return;
   const id = arena.scanNearby(player.x, player.z);
-  if (!id) { announce('MOVE CLOSER TO A VIOLET EVIDENCE BEACON', 'neutral', 1800); return; }
-  campaign = recordMissionEvent(campaign, { type: 'evidence', id });
-  stats = { ...stats, score: stats.score + 300 };
+  if (!id) {
+    if (campaign.mission === 1) announce('MOVE CLOSER TO A VIOLET EVIDENCE BEACON', 'neutral', 1800);
+    return;
+  }
+  campaign = recordMissionEvent(campaign, id === 'SHUTDOWN' ? { type: 'shutdown', id } : { type: 'evidence', id });
+  stats = { ...stats, score: stats.score + (id === 'SHUTDOWN' ? 600 : 300) };
   audio.destroy();
-  announce(`EVIDENCE VERIFIED // ${id} CAPTURED`, 'success', 2200);
+  announce(id === 'SHUTDOWN' ? 'MAINFRAME SHUT DOWN // NETWORK RECOVERED' : `EVIDENCE VERIFIED // ${id} CAPTURED`, 'success', 2600);
   updateStats();
 }
 
@@ -356,7 +456,8 @@ function updateWaypoint(): void {
   const side = Math.cos(yaw) * dx - Math.sin(yaw) * dz;
   const angle = Math.atan2(side, ahead);
   const direction = Math.abs(angle) > 2.4 ? 'BEHIND' : angle < -0.48 ? '◀ LEFT' : angle > 0.48 ? 'RIGHT ▶' : '▲ AHEAD';
-  const action = campaign.mission === 1 && nearby.distance <= 3.1 ? ' · PRESS E TO SCAN' : '';
+  const action = (campaign.mission === 1 && nearby.distance <= 3.1 || nearby.id === 'SHUTDOWN' && nearby.distance <= 3.5)
+    ? nearby.id === 'SHUTDOWN' ? ' · PRESS E TO SHUT DOWN' : ' · PRESS E TO SCAN' : '';
   panel.textContent = `◈ ${nearby.id}  /  ${Math.round(nearby.distance)}M  /  ${direction}${action}`;
   panel.classList.toggle('interact-ready', action.length > 0);
 }
@@ -398,8 +499,11 @@ function loop(timeMs: number): void {
   if (!paused) {
     gameTime += elapsed;
     runTime += elapsed;
+    damageCooldown = Math.max(0, damageCooldown - elapsed);
     waypointRefresh -= elapsed;
     if (waypointRefresh <= 0) { waypointRefresh = 0.16; updateWaypoint(); }
+    minimapRefresh -= elapsed;
+    if (minimapRefresh <= 0) { minimapRefresh = 0.12; drawMinimap(); }
     const forward = Number(keys.has('KeyW') || keys.has('ArrowUp')) - Number(keys.has('KeyS') || keys.has('ArrowDown'));
     const right = Number(keys.has('KeyD') || keys.has('ArrowRight')) - Number(keys.has('KeyA') || keys.has('ArrowLeft'));
     const sprint = keys.has('ShiftLeft') || keys.has('ShiftRight');
@@ -429,7 +533,9 @@ function loop(timeMs: number): void {
       if (reloading <= 0) { ammo = 30; reloading = 0; updateAmmo(); }
     }
   }
-  arena.update(paused ? elapsed * 0.18 : elapsed, paused ? visibleTime * 0.16 : gameTime, lastWalkAmount, player.slideRemaining > 0);
+  const incomingDamage = arena.update(paused ? elapsed * 0.18 : elapsed, paused ? visibleTime * 0.16 : gameTime,
+    lastWalkAmount, player.slideRemaining > 0, paused ? undefined : { x: player.x, y: bobEye + player.lift - 0.4, z: player.z });
+  if (incomingDamage) receiveDamage(incomingDamage);
   if (bloom.enabled) composer.render();
   else renderer.render(arena.scene, arena.camera);
   updateMetrics(rawElapsed);
@@ -443,6 +549,11 @@ element('closeManual').addEventListener('click', () => manualDialog.close());
 element('pauseButton').addEventListener('click', pauseGame);
 element('engineeringButton').addEventListener('click', toggleEngineering);
 qualitySelect.addEventListener('change', () => { autoTierOverride = null; strugglingSeconds = 0; resize(); });
+sensitivityRange.addEventListener('input', () => {
+  sensitivity = Number(sensitivityRange.value);
+  element('sensitivityValue').textContent = `${Math.round(sensitivity * 100)}%`;
+  try { localStorage.setItem('relay-nine-mouse-sensitivity', String(sensitivity)); } catch { /* Optional */ }
+});
 soundButton.addEventListener('click', () => {
   void audio.setEnabled(!audio.enabled).then(() => {
     soundButton.textContent = audio.enabled ? '♫ SOUND ON' : '♫ SOUND OFF';
@@ -455,9 +566,9 @@ document.addEventListener('pointerlockchange', () => {
 });
 document.addEventListener('mousemove', (event) => {
   if (paused || document.pointerLockElement !== canvas) return;
-  const sensitivity = 0.00195;
-  yaw -= event.movementX * sensitivity;
-  pitch -= event.movementY * sensitivity;
+  const turnRate = 0.00195 * sensitivity;
+  yaw -= event.movementX * turnRate;
+  pitch -= event.movementY * turnRate;
   pitch = Math.max(-1.35, Math.min(1.35, pitch));
 });
 document.addEventListener('mousedown', (event) => { if (event.button === 0 && document.pointerLockElement === canvas) fireHeld = true; });
@@ -482,6 +593,12 @@ window.addEventListener('resize', resize);
 reducedMotion.addEventListener('change', resize);
 
 resize();
+try {
+  const saved = Number(localStorage.getItem('relay-nine-mouse-sensitivity'));
+  if (saved >= 0.5 && saved <= 2.5) sensitivity = saved;
+} catch { /* Storage access may be unavailable. */ }
+sensitivityRange.value = String(sensitivity);
+element('sensitivityValue').textContent = `${Math.round(sensitivity * 100)}%`;
 resetCampaign();
 showMenu('intro');
 setVisibleGameHud(false);

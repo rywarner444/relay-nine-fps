@@ -1,4 +1,5 @@
 /** Deterministic FPS movement and range scoring; no DOM or Three.js dependencies. */
+import { FACILITY_HALF_WIDTH, FACILITY_HALF_DEPTH, FACILITY_START } from './facility';
 
 export interface Blocker {
   x: number;
@@ -36,14 +37,13 @@ export interface RangeStats {
   integrity: number;
 }
 
-export const RANGE_GOAL = 6;
 export const PLAYER_RADIUS = 0.46;
-export const ARENA_HALF_WIDTH = 21.5;
-export const ARENA_HALF_DEPTH = 25;
+export const ARENA_HALF_WIDTH = FACILITY_HALF_WIDTH - PLAYER_RADIUS;
+export const ARENA_HALF_DEPTH = FACILITY_HALF_DEPTH - PLAYER_RADIUS;
 
 export function initialPlayer(): PlayerMotion {
   return {
-    x: 0, z: 17, lift: 0, verticalSpeed: 0, grounded: true,
+    x: FACILITY_START.x, z: FACILITY_START.z, lift: 0, verticalSpeed: 0, grounded: true,
     slideRemaining: 0, slideCooldown: 0, slideX: 0, slideZ: 0,
   };
 }

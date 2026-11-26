@@ -43,9 +43,11 @@ try {
   assert.equal(ammo, '30', 'Weapon HUD should initialize with a full magazine');
   assert.ok((await page.locator('#objectiveTitle').textContent())?.includes('Identify and contain'));
   assert.equal(await page.locator('#objectiveCount').textContent(), '0 / 4');
+  assert.equal(await page.locator('#healthValue').textContent(), '100 / 100');
+  assert.equal(await page.locator('#minimapPanel').isVisible(), true);
   assert.equal(await page.locator('#menuOverlay').isVisible(), false);
   assert.equal(errors.length, 0, `Browser errors: ${errors.join('; ')}`);
-  process.stdout.write('Smoke test passed: loaded 3D campaign menu, field manual, first mission and weapon HUD.\n');
+  process.stdout.write('Smoke test passed: campaign menu, updated manual, tactical minimap, health and first mission HUD.\n');
 } finally {
   await browser?.close();
   server.kill('SIGTERM');

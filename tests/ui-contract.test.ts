@@ -19,7 +19,7 @@ test('field manual and three-mission campaign have discoverable instructions', (
   assert.match(html, /START OPERATION/);
   assert.match(html, /id="qualitySelect"/);
   assert.match(html, /id="restartButton"/);
-  assert.match(html, /press Esc/i);
+  assert.match(html, /Pause \/ settings/i);
   assert.match(html, /E<\/kbd>/);
   assert.match(html, /MISSION 01 \/ 03/);
 });
@@ -32,6 +32,9 @@ test('Relay Nine uses a distinct combat HUD identity and visible slide cue', () 
   assert.match(html, /id="fpsChip"/);
   assert.match(html, /id="waypointPanel"/);
   assert.match(html, /id="debrief"/);
+  assert.match(html, /id="minimapCanvas"/);
+  assert.match(html, /id="healthFill"/);
+  assert.match(html, /id="sensitivityRange"/);
 });
 
 test('the campaign distinguishes scripted game rules from real AI or security telemetry', () => {
